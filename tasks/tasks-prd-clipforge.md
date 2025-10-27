@@ -17,17 +17,20 @@
 ## Relevant Files
 
 ### Core Application Structure
-- `package.json` - Project dependencies and scripts
-- `electron/main.ts` - Electron main process entry point
-- `electron/preload.ts` - Preload script for secure IPC
-- `src/App.tsx` - Root React component
-- `src/main.tsx` - React app entry point
-- `vite.config.ts` - Vite build configuration
-- `electron-builder.yml` - Electron packaging configuration
+- `package.json` - ✅ Project dependencies and scripts
+- `electron/main/index.ts` - ✅ Electron main process entry point
+- `electron/preload/index.ts` - ✅ Preload script for secure IPC (contextBridge API)
+- `electron/ipc-handlers.ts` - ✅ IPC handlers for file operations and FFmpeg
+- `src/App.tsx` - ✅ Root React component with dark theme UI shell
+- `src/App.css` - ✅ Dark theme styling
+- `src/main.tsx` - ✅ React app entry point
+- `vite.config.ts` - ✅ Vite build configuration
+- `electron-builder.json` - ✅ Electron packaging configuration (.dmg for Mac)
 
 ### State Management
-- `src/store/timelineStore.ts` - Zustand store for timeline state (clips, tracks, playhead position)
-- `src/types/index.ts` - TypeScript type definitions (Clip, Track, TimelineState, etc.)
+- `src/store/timelineStore.ts` - ✅ Zustand store for timeline state (clips, tracks, playhead position)
+- `src/types/index.ts` - ✅ TypeScript type definitions (Clip, Track, TimelineState, IPC channels)
+- `src/types/electron.d.ts` - ✅ TypeScript declarations for Electron IPC API
 
 ### Components
 - `src/components/MediaLibrary.tsx` - File import and media library UI
@@ -57,16 +60,16 @@
 
 ## Phases
 
-- [ ] **1.0 Project Setup & Development Environment** 🔴 Day 1
-  - [ ] 1.1 Initialize Electron + React + TypeScript project using `electron-vite` or similar boilerplate
-  - [ ] 1.2 Configure Vite for Electron with hot reload
-  - [ ] 1.3 Set up project structure (src/, electron/, components/, services/, store/, utils/)
-  - [ ] 1.4 Install core dependencies: React, Zustand, TypeScript, Electron, electron-builder
-  - [ ] 1.5 Install FFmpeg binary (download static build or use `ffmpeg-static` package)
-  - [ ] 1.6 Configure electron-builder in package.json for Mac builds (.dmg target)
-  - [ ] 1.7 Set up basic IPC communication between main and renderer processes
-  - [ ] 1.8 Create basic app shell with dark theme and placeholder UI sections
-  - [ ] 1.9 Verify app launches in dev mode (`npm run dev`)
+- [x] **1.0 Project Setup & Development Environment** 🔴 Day 1
+  - [x] 1.1 Initialize Electron + React + TypeScript project using `electron-vite` or similar boilerplate
+  - [x] 1.2 Configure Vite for Electron with hot reload
+  - [x] 1.3 Set up project structure (src/, electron/, components/, services/, store/, utils/)
+  - [x] 1.4 Install core dependencies: React, Zustand, TypeScript, Electron, electron-builder
+  - [x] 1.5 Install FFmpeg binary (download static build or use `ffmpeg-static` package)
+  - [x] 1.6 Configure electron-builder in package.json for Mac builds (.dmg target)
+  - [x] 1.7 Set up basic IPC communication between main and renderer processes
+  - [x] 1.8 Create basic app shell with dark theme and placeholder UI sections
+  - [x] 1.9 Verify app launches in dev mode (`npm run dev`)
 
 - [ ] **2.0 MVP Core Features (Import, Timeline, Preview, Trim, Export)** 🔴 Day 1
   - [ ] 2.1 **File Import**
