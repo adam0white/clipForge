@@ -2,6 +2,49 @@
 
 ## General Development Patterns (Learned from Past Projects)
 
+### Intent-State-View Pattern
+
+**Core Concept**: Applications need more than just `View = f(State)`. They need `Intent → State → View`.
+
+**The Problem**: 
+- Text editor: cursor on line 1 col 6, press down → line 2 col 6, but line 2 is only 1 char
+- Cursor moves to col 1, but pressing down again should return to col 6
+- The "true" cursor position is both col 1 AND col 6 simultaneously
+
+**The Solution**:
+Intent (what user wants) → State (valid, renderable) → View (display)
+
+**Key Principles**:
+1. **Intent is source of truth** - Preserve what user actually wants, even if currently invalid
+2. **State is derived** - Parse and validate Intent into State for rendering
+3. **Preserve invalid intent** - Don't discard "impossible" values, they may become valid later
+4. **New intent from state, old intent preserved** - Mixed function of previous intent + state
+
+**Examples in UX**:
+- Tree view remembers expand/collapse state for hidden rows
+- Tabs remember which tab was selected, even if currently disabled
+- Widget toggles A/B/C remember ALL options, even if mutually exclusive
+- Spreadsheets allow cyclic references temporarily (fixing one side fixes the other)
+
+**UI Etiquette**: When software "remembers" your intent, it's invisible. When it forgets, users notice and get frustrated. Good UX is the goalkeeper's curse - only noticed when it fails.
+
+**Validation Strategy**:
+- Validate continuously and non-destructively
+- Preserve the "mess" as much as possible
+- Allow state transitions through invalid states
+- New intent should be as valid as possible, old intent preserved as-is
+
+**Architecture Impact**:
+- Don't flatten intent into normalized state
+- APIs should accept liberal user intent, not just valid mutations
+- User-space should be very forgiving, kernel-space can be strict
+- Front-end should sit NEXT to back-end, not in front of it
+- User data belongs to user, not the system
+
+**Reference**: [I is for Intent by Steven Wittens](https://acko.net/blog/i-is-for-intent/)
+
+---
+
 ### Optimistic UI Pattern
 Best for user-facing actions that need immediate feedback:
 
