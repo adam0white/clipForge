@@ -1,44 +1,46 @@
 # Tech Context: ClipForge
 
-## Tech Stack (TBD - To Be Decided)
+## Tech Stack
 
-### Desktop Framework Options
-- **Electron**: More mature ecosystem, larger bundle size, Node.js access
-- **Tauri**: Rust-based, smaller binaries, faster startup, modern approach
+### Desktop Framework
+- **Electron** - Mature ecosystem, excellent FFmpeg integration via Node.js
+  - Chosen over Tauri due to 72-hour deadline and extensive video editing examples
 
-### Frontend Options
-- React, Vue, Svelte, or Vanilla JS
-- TypeScript recommended for type safety
+### Frontend
+- **React** - Component-based UI, large ecosystem
+- **TypeScript** - Type safety and better developer experience
+- **Zustand** - Lightweight state management for timeline state
+- **Vite** - Fast build tool with HMR
 
 ### Media Processing
-- **FFmpeg** - Essential for encoding/decoding
-  - `fluent-ffmpeg` for Node.js (Electron)
-  - `@ffmpeg/ffmpeg` for browser context
-  - Native commands in Tauri
-- **MediaRecorder API** - For screen/webcam recording
-- **desktopCapturer** (Electron) or platform-specific APIs (Tauri)
+- **FFmpeg** - Video encoding/decoding/processing
+  - `fluent-ffmpeg` npm package or direct CLI calls
+  - Static binary packaged with app
+- **MediaRecorder API** - Screen and webcam recording
+- **Electron desktopCapturer** - Screen source selection
 
-### Timeline UI Options
-- HTML5 Canvas
-- Fabric.js or Konva.js
-- Custom CSS/DOM solution
+### UI Components
+- **Timeline**: Start with CSS/DOM, migrate to Canvas if performance issues
+- **Video Player**: HTML5 `<video>` element (sufficient for preview)
 
-### Video Player
-- HTML5 `<video>` element
-- Video.js
-- Plyr
+### Build & Packaging
+- **electron-vite** - Development with hot reload
+- **electron-builder** - Packaging for Mac (.dmg)
 
-## Architecture Patterns (To Be Implemented)
+## Architecture
 
-### Build Strategy
-1. **Start with Import and Preview** - Validate media pipeline first
-2. **Build the Timeline** - Core interface before complex features
-3. **Add Recording Last** - Not critical for MVP
-4. **Test Export Early** - FFmpeg encoding can be tricky
-5. **Package and Test** - Don't wait until last minute
+- **Non-destructive editing** - Store edit decisions (in/out points), never modify source files
+- **Optimistic UI** - Update timeline immediately, process in background
+- **IPC Communication** - FFmpeg operations run in main process, UI in renderer
+- **State Structure**: Clips (source path, in/out points, position) → Tracks → Timeline
 
-## Development Commands (To Be Defined)
-Will be added once stack is chosen.
+## Development Commands
+- `npm run dev` - Launch in development mode
+- `npm run build` - Production build
+- `npm run package` - Create distributable app
 
-## Critical Configuration Notes
-Will be documented as decisions are made.
+## Critical Notes
+- Package FFmpeg binary with app (don't rely on system installation)
+- Test packaging early (end of Day 1)
+- Validate exported videos in multiple players (VLC, QuickTime)
+- Monitor memory usage with multiple clips
