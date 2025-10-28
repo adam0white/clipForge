@@ -330,20 +330,166 @@ export const config = {
 
 ## Project-Specific Patterns
 
-Will be documented as architectural decisions are made and patterns emerge during development.
-
 ### Architecture Decisions
 
-To be documented.
+**Custom Protocol for Video Files** (Official Electron Approach)
+- Electron blocks direct `file://` URLs in renderer for security
+- Solution: `protocol.handle()` with `net.fetch()` - Official Electron API (v23+)
+- Custom `safe-file://` scheme registered with streaming privileges
+- Uses `pathToFileURL()` for proper file URL conversion
+- Provides secure local file access with proper streaming support for media
+
+**Non-Destructive Editing**
+- Store trim points (in/out timestamps) in Zustand store
+- Never modify source files
+- Export process reads source files and applies trims during encoding
+
+**IPC for Heavy Operations**
+- FFmpeg runs in main process (has Node.js access)
+- Progress updates sent via IPC events
+- Prevents UI blocking during export
+
+**Separation of Library and Timeline**
+- Library: Stores imported video files (deduplicated by filePath)
+- Timeline: Stores clip instances (can have multiple instances of same video)
+- Deleting clip from timeline does NOT remove from library
+- Library items can be re-added to timeline multiple times
+
+**Video Element Cleanup & Optimization**
+- Single video element per import (not 3 separate ones)
+- `extractAllVideoData()` gets duration, metadata, and thumbnail in one pass
+- Prevents resource contention from simultaneous file loads
+- Proper cleanup: `video.src = '', video.load(), video.remove()`
+- 10-second timeout with duplicate-prevention flag
+- Reduced thumbnail quality (0.5) to minimize base64 size
 
 ### Data Flow
 
-To be documented.
+**Import Flow:**
+1. User drops files or uses file picker
+2. Files validated (extension check)
+3. Video element loads metadata (duration, dimensions)
+4. Thumbnail generated (canvas screenshot at 1s)
+5. Clip object created and added to Zustand store
+6. UI updates automatically (reactive)
+
+**Export Flow:**
+1. User clicks Export → Dialog opens
+2. Clips collected from store, sorted by startTime
+3. IPC call to main process with clips + settings
+4. Main process uses FFmpeg to:
+   - Single clip: trim + encode directly
+   - Multiple clips: process each → concat → encode
+5. Progress updates sent back to renderer
+6. On completion, save dialog returns file path
 
 ### Performance Optimizations
 
-To be documented.
+**Thumbnail Generation:**
+- Generated once on import
+- Stored as base64 data URL in memory
+- Prevents repeated file reads
+
+**Timeline Rendering:**
+- CSS transforms for smooth animations
+- Clip width calculated: `(trimEnd - trimStart) * zoom`
+- Position calculated: `startTime * zoom`
+
+**Video Playback:**
+- HTML5 video element (hardware accelerated)
+- Trim enforcement via `currentTime` boundaries
+- Lightweight compared to Canvas rendering
 
 ### Known Limitations
 
-To be documented as discovered.
+**Current MVP Limitations:**
+
+1. **Video Metadata Detection**
+   - Uses HTML5 video element (not FFprobe)
+   - Cannot accurately detect codec, framerate, bitrate
+   - Assumption: 30fps default, codec unknown
+   - Impact: Minor - doesn't affect functionality
+
+2. **Thumbnail Quality**
+   - Generated from 1-second mark
+   - May not be representative for short clips or fade-ins
+   - Single frame capture (not middle of clip)
+   - Impact: Visual only - doesn't affect editing
+
+3. **Export Performance**
+   - Multiple clips require intermediate file processing
+   - Each clip encoded separately, then concatenated
+   - Slower than direct stream processing
+   - Impact: 3+ clips may take 2-3x longer than single export
+
+4. **Platform Support**
+   - Mac-first development (tested on macOS only)
+   - Windows/Linux untested
+   - FFmpeg binary paths may differ
+   - Impact: May need adjustments for cross-platform
+
+5. **File Protocol Security (FIXED)**
+   - Initial implementation used `file://` protocol - blocked by Electron security
+   - Solution: Custom `safe-file://` protocol using `protocol.handle()` + `net.fetch()`
+   - Critical insight: URL parser treats `safe-file:///Users/...` as hostname='Users', pathname='/abdul/...'
+   - Fix: Reconstruct full path: `'/' + hostname + pathname` = `/Users/abdul/...`
+   - Note: macOS filesystem is case-insensitive, so lowercase 'users' works fine
+   - Impact: None (resolved in current version)
+
+6. **Drag-and-Drop Import (FIXED)**
+   - HTML5 File API doesn't expose file paths by default
+   - Solution: Use Electron's `webUtils.getPathForFile(file)` in preload script
+   - Exposes secure file path extraction from File objects
+   - Impact: None (resolved in current version)
+
+7. **Gaps in Timeline (Current Behavior)**
+   - Timeline allows gaps between clips visually
+   - Export concatenates clips end-to-end (gaps removed)
+   - Rationale: Simplifies MVP export logic, matches most editing use cases
+   - Impact: User may be surprised gaps disappear in export
+   
+   **Future Enhancement Ideas (Phase 3+):**
+   - **Option 1: Preserve Gaps** - Insert black frames equal to gap duration
+   - **Option 2: Close Gaps** - Add button to collapse gaps (move clips left)
+   - **Option 3: Gap Selection** - Click gaps to select/delete, bringing clips end-to-end
+   - **Option 4: Smart Export** - Ask user on export: "Keep gaps (black frames)" or "Remove gaps"
+   - User preference would be remembered for future exports
+
+8. **Clip Repositioning (Deferred)**
+   - Clips cannot be dragged to new positions
+   - Clips are positioned sequentially on import
+   - Workaround: Re-import files in desired order, or use trim to reorder
+   - Status: Deferred to Phase 3+ (drag-and-drop repositioning)
+   - Impact: Less flexible editing workflow
+
+9. **Memory Usage**
+   - Thumbnails stored as base64 in memory
+   - Large number of clips (50+) may consume significant RAM
+   - No thumbnail cleanup on clip removal
+   - Impact: Potential memory leak with heavy usage
+
+8. **Video Format Support**
+   - Limited to common formats (MP4, MOV, AVI, MKV, WebM)
+   - Exotic codecs may fail to load
+   - No validation of codec compatibility
+   - Impact: Some videos may not import
+
+**Architecture Limitations:**
+
+1. **Single Track Focus**
+   - Multi-track UI exists but not fully implemented
+   - Export only processes clips from first track
+   - No track mixing/compositing
+   - Impact: Feature incomplete (planned for Phase 4.0)
+
+2. **No Undo/Redo**
+   - State changes are immediate and permanent
+   - No history tracking in Zustand store
+   - Users must manually revert changes
+   - Impact: Poor UX for mistakes
+
+3. **No Auto-Save**
+   - Project state lives only in memory
+   - App close/crash loses all work
+   - No project file format
+   - Impact: High risk of data loss

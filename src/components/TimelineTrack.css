@@ -1,0 +1,36 @@
+.timeline-track {
+  position: relative;
+  min-height: 64px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.track-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 120px;
+  padding: 0.5rem;
+  background: linear-gradient(to right, var(--bg-secondary) 0%, var(--bg-secondary) 80%, transparent 100%);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.track-name {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.track-content {
+  position: relative;
+  padding: 8px;
+  min-height: 64px;
+}
+

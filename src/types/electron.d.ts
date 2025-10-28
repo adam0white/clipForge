@@ -2,8 +2,10 @@
 
 export interface ElectronAPI {
   // File operations
+  showOpenDialog: () => Promise<{ canceled: boolean; filePaths: string[] }>
   importFiles: () => Promise<{ canceled: boolean; filePaths: string[] }>
   exportDialog: () => Promise<{ canceled: boolean; filePath: string | null }>
+  getPathForFile: (file: File) => string
   
   // Video operations
   getVideoMetadata: (filePath: string) => Promise<{

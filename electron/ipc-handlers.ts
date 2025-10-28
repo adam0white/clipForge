@@ -1,7 +1,8 @@
-import { ipcMain, dialog } from 'electron'
+import { ipcMain, dialog, BrowserWindow } from 'electron'
 import path from 'node:path'
 import fs from 'node:fs/promises'
-import { IPC_CHANNELS } from '../src/types'
+import { IPC_CHANNELS, ExportRequest } from '../src/types'
+import { exportVideo } from './services/ffmpeg'
 
 /**
  * Set up IPC handlers for communication between main and renderer processes
@@ -61,13 +62,39 @@ export function setupIpcHandlers() {
     }
   })
 
-  // FFmpeg export handler (placeholder for now)
-  ipcMain.handle(IPC_CHANNELS.FFMPEG_EXPORT, async (_, exportRequest) => {
-    console.log('FFmpeg export requested:', exportRequest)
-    // Will implement FFmpeg processing later
-    return {
-      success: false,
-      error: 'FFmpeg export not yet implemented',
+  // FFmpeg export handler
+  ipcMain.handle(IPC_CHANNELS.FFMPEG_EXPORT, async (event, exportRequest: ExportRequest) => {
+    console.log('FFmpeg export requested:', {
+      clipCount: exportRequest.clips.length,
+      resolution: exportRequest.settings.resolution,
+      outputPath: exportRequest.settings.outputPath,
+    })
+    
+    try {
+      const mainWindow = BrowserWindow.fromWebContents(event.sender)
+      
+      // Export with progress callback
+      const result = await exportVideo(
+        exportRequest.clips,
+        exportRequest.settings,
+        (percent) => {
+          // Send progress updates to renderer
+          mainWindow?.webContents.send(IPC_CHANNELS.FFMPEG_PROGRESS, {
+            percent,
+            currentClip: 1,
+            totalClips: exportRequest.clips.length,
+            message: `Exporting... ${Math.round(percent)}%`,
+          })
+        }
+      )
+      
+      return result
+    } catch (error) {
+      console.error('Export error:', error)
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown export error',
+      }
     }
   })
 }

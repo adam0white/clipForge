@@ -1,10 +1,14 @@
-import { ipcRenderer, contextBridge } from 'electron'
+import { ipcRenderer, contextBridge, webUtils } from 'electron'
 
 // --------- Expose some API to the Renderer process ---------
 contextBridge.exposeInMainWorld('electron', {
   // File operations
+  showOpenDialog: () => ipcRenderer.invoke('file:import'),
   importFiles: () => ipcRenderer.invoke('file:import'),
   exportDialog: () => ipcRenderer.invoke('file:export-dialog'),
+  
+  // Get file path from File object (for drag-and-drop)
+  getPathForFile: (file: File) => webUtils.getPathForFile(file),
   
   // Video operations
   getVideoMetadata: (filePath: string) => ipcRenderer.invoke('video:metadata', filePath),

@@ -1,6 +1,6 @@
-import { app, BrowserWindow, shell, ipcMain } from 'electron'
+import { app, BrowserWindow, shell, ipcMain, protocol, net } from 'electron'
 import { createRequire } from 'node:module'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import path from 'node:path'
 import os from 'node:os'
 import { update } from './update'
@@ -34,6 +34,21 @@ if (os.release().startsWith('6.1')) app.disableHardwareAcceleration()
 
 // Set application name for Windows 10+ notifications
 if (process.platform === 'win32') app.setAppUserModelId(app.getName())
+
+// Register custom protocol as privileged (before app.whenReady)
+// This is the official Electron way to serve local media files securely
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'safe-file',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      stream: true,  // Critical for video/audio streaming
+      bypassCSP: true,
+    },
+  },
+])
 
 if (!app.requestSingleInstanceLock()) {
   app.quit()
@@ -83,6 +98,50 @@ async function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // Register custom protocol handler using modern Electron API
+  // This is the official recommended approach for serving local media files
+  protocol.handle('safe-file', (request) => {
+    try {
+      // Parse the URL to extract the file path
+      // CRITICAL: URL parser treats first path segment as hostname!
+      // safe-file:///Users/... → hostname='Users' (lowercased to 'users'), pathname='/abdul/...'
+      // We need to reconstruct: /<hostname><pathname>
+      const requestUrl = new URL(request.url)
+      let filePath = decodeURIComponent(requestUrl.pathname)
+      
+      // Reconstruct full path from hostname + pathname
+      if (requestUrl.hostname) {
+        // The hostname is actually the first directory in the path
+        // Reconstruct: /Users + /abdul/... = /Users/abdul/...
+        filePath = '/' + requestUrl.hostname + filePath
+      }
+      
+      // On Windows, pathname might be /C:/... so we need to remove leading slash
+      if (process.platform === 'win32' && /^\/[a-zA-Z]:/.test(filePath)) {
+        filePath = filePath.slice(1)
+      }
+      
+      // Security check: ensure the path is absolute
+      if (!path.isAbsolute(filePath)) {
+        console.error('[Protocol Error] Invalid path (not absolute):', filePath)
+        return new Response('Bad Request', { 
+          status: 400, 
+          headers: { 'content-type': 'text/plain' } 
+        })
+      }
+      
+      // Convert to file URL and use net.fetch for proper streaming
+      const fileUrl = pathToFileURL(filePath).toString()
+      return net.fetch(fileUrl)
+    } catch (error) {
+      console.error('[Protocol Handler] Error:', error)
+      return new Response('Internal Server Error', { 
+        status: 500, 
+        headers: { 'content-type': 'text/plain' } 
+      })
+    }
+  })
+  
   setupIpcHandlers()
   createWindow()
 })

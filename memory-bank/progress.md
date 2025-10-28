@@ -1,16 +1,16 @@
 # Progress: ClipForge
 
-**Updated**: 2025-10-27
-**Status**: 🟢 Phase 1.0 Complete - Development Ready
+**Updated**: 2025-10-28
+**Status**: 🟢 Phase 2.0 Complete - MVP Core Features Working
 
-## MVP Progress (1/7)
+## MVP Progress (6/7)
 
 - ✅ Desktop app that launches (Electron or Tauri)
-- ⏳ Basic video import (drag & drop or file picker for MP4/MOV)
-- ⏳ Simple timeline view showing imported clips
-- ⏳ Video preview player that plays imported clips
-- ⏳ Basic trim functionality (set in/out points on a single clip)
-- ⏳ Export to MP4 (even if just one clip)
+- ✅ Basic video import (drag & drop or file picker for MP4/MOV)
+- ✅ Simple timeline view showing imported clips
+- ✅ Video preview player that plays imported clips
+- ✅ Basic trim functionality (set in/out points on a single clip)
+- ✅ Export to MP4 (even if just one clip)
 - ⏳ Built and packaged as a native app (not just dev mode)
 
 ## Core Features Progress (0/6)
@@ -33,26 +33,38 @@
 
 ## What Works
 
-Planning and Phase 1.0 complete:
-- ✅ PRD created (`tasks/prd-clipforge.md`)
-- ✅ Task list generated (`tasks/tasks-prd-clipforge.md`)
-- ✅ Tech stack decisions made (Electron + React + TypeScript)
+**Phase 1.0 - Project Setup:**
+- ✅ PRD and task list created
 - ✅ Electron + React + TypeScript project initialized (electron-vite-react template)
 - ✅ All dependencies updated to latest versions (React 19, Vite 7, Electron 38)
-- ✅ Dark theme UI shell with placeholder sections (Header, Media Library, Preview, Timeline)
-- ✅ IPC communication setup (file import/export dialogs, FFmpeg handlers)
-- ✅ Zustand store created for timeline state management
-- ✅ TypeScript types defined (Clip, Track, TimelineState)
-- ✅ FFmpeg installed (@ffmpeg-installer/ffmpeg + fluent-ffmpeg)
+- ✅ Dark theme UI with responsive layout
+- ✅ IPC communication setup
+- ✅ Zustand store for state management
+- ✅ FFmpeg integration (@ffmpeg-installer/ffmpeg + fluent-ffmpeg)
 - ✅ electron-builder configured for Mac .dmg builds
-- ✅ App launches in dev mode without errors
+
+**Phase 2.0 - MVP Core Features:**
+- ✅ File import via drag-and-drop, browse button, and Import button
+- ✅ Video validation and metadata extraction (single optimized video element)
+- ✅ Media library with thumbnails (deduplicated by file path)
+- ✅ Timeline view with zoom controls, time ruler, and playhead
+- ✅ Timeline clips with proportional duration display
+- ✅ Video preview player with play/pause/seek controls
+- ✅ Continuous playback across multiple clips
+- ✅ Trim functionality with draggable handles (in/out points)
+- ✅ Optimistic UI for responsive trim operations
+- ✅ Delete clips from timeline (library remains intact)
+- ✅ Re-add clips from library to timeline multiple times
+- ✅ Export to MP4 with FFmpeg (clips concatenated end-to-end)
+- ✅ Export progress tracking
+- ✅ Custom `safe-file://` protocol for secure local file access
 
 ## What's Left
 
-Core feature implementation - 5 phases remaining:
-- Day 1 (MVP): ✅ Phase 1.0, Phases 2.0, 3.0
-- Day 2: Phases 4.0, 5.0
-- Day 3: Phase 6.0
+Core feature implementation - 4 phases remaining:
+- Day 1 (MVP): ✅ Phase 1.0, ✅ Phase 2.0, ⏳ Phase 3.0 (Packaging/Distribution)
+- Day 2: Phases 4.0 (Screen Recording), 5.0 (Enhancements)
+- Day 3: Phase 6.0 (Testing & Polish)
 
 ## Blockers
 
@@ -60,7 +72,7 @@ None.
 
 ## Key Milestones
 
-- **Completed**: ✅ Phase 1.0 (Project Setup)
-- **Next**: Phase 2.0 (MVP Core Features)
-- **Day 1 Goal**: MVP packaged and tested (Tuesday 10:59 PM CT)
-- **Day 3 Goal**: Final submission (Wednesday 10:59 PM CT)
+- **Completed**: ✅ Phase 1.0 (Project Setup), ✅ Phase 2.0 (MVP Core Features)
+- **Next**: Phase 3.0 (Packaging/Distribution - .dmg for Mac)
+- **Day 1 Goal**: MVP packaged and tested
+- **Day 3 Goal**: Final submission

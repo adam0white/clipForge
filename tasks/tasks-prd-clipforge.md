@@ -33,23 +33,23 @@
 - `src/types/electron.d.ts` - ✅ TypeScript declarations for Electron IPC API
 
 ### Components
-- `src/components/MediaLibrary.tsx` - File import and media library UI
-- `src/components/VideoPreview.tsx` - Video player component
-- `src/components/Timeline.tsx` - Timeline editor component
-- `src/components/TimelineClip.tsx` - Individual clip representation on timeline
-- `src/components/TimelineTrack.tsx` - Track container component
-- `src/components/ExportDialog.tsx` - Export settings and progress UI
+- `src/components/MediaLibrary.tsx` - ✅ File import and media library UI
+- `src/components/VideoPreview.tsx` - ✅ Video player component
+- `src/components/Timeline.tsx` - ✅ Timeline editor component
+- `src/components/TimelineClip.tsx` - ✅ Individual clip representation on timeline
+- `src/components/TimelineTrack.tsx` - ✅ Track container component
+- `src/components/ExportDialog.tsx` - ✅ Export settings and progress UI
 - `src/components/RecordingControls.tsx` - Screen/webcam recording UI
 
 ### Services
-- `src/services/ffmpeg.ts` - FFmpeg integration for video export
+- `electron/services/ffmpeg.ts` - ✅ FFmpeg integration for video export (main process)
 - `src/services/recorder.ts` - Screen and webcam recording logic
 - `src/services/videoProcessor.ts` - Video metadata extraction and validation
-- `electron/ipc-handlers.ts` - IPC handlers for file operations, FFmpeg calls
+- `electron/ipc-handlers.ts` - ✅ IPC handlers for file operations, FFmpeg calls
 
 ### Utilities
 - `src/utils/timelineCalculations.ts` - Timeline position/duration calculations
-- `src/utils/videoUtils.ts` - Video format validation, thumbnail generation
+- `src/utils/videoUtils.ts` - ✅ Video format validation, thumbnail generation, metadata extraction
 
 ### Notes
 - No test files initially - focus on working MVP first, add tests if time permits
@@ -71,37 +71,37 @@
   - [x] 1.8 Create basic app shell with dark theme and placeholder UI sections
   - [x] 1.9 Verify app launches in dev mode (`npm run dev`)
 
-- [ ] **2.0 MVP Core Features (Import, Timeline, Preview, Trim, Export)** 🔴 Day 1
-  - [ ] 2.1 **File Import**
-    - [ ] 2.1.1 Create MediaLibrary component with drag-and-drop zone
-    - [ ] 2.1.2 Add file picker dialog (MP4/MOV filter)
-    - [ ] 2.1.3 Validate imported files (check if video is readable)
-    - [ ] 2.1.4 Extract video metadata (duration, resolution, codec) using video element or FFprobe
-    - [ ] 2.1.5 Add imported clips to Zustand timeline store
-  - [ ] 2.2 **Timeline View**
-    - [ ] 2.2.1 Create Timeline component with horizontal scrollable container
-    - [ ] 2.2.2 Create TimelineClip component (visual block with thumbnail, duration label)
-    - [ ] 2.2.3 Display clips on timeline proportional to their duration
-    - [ ] 2.2.4 Add time markers/ruler (show seconds/minutes)
-    - [ ] 2.2.5 Implement playhead indicator (vertical line showing current position)
-  - [ ] 2.3 **Video Preview Player**
-    - [ ] 2.3.1 Create VideoPreview component using HTML5 `<video>` element
-    - [ ] 2.3.2 Implement play/pause/stop controls
-    - [ ] 2.3.3 Load selected clip into preview player
-    - [ ] 2.3.4 Sync playhead position with video currentTime
-  - [ ] 2.4 **Trim Functionality**
-    - [ ] 2.4.1 Add in/out point UI controls (buttons or handles on timeline clip)
-    - [ ] 2.4.2 Update clip trim data in store (store in/out timestamps, don't modify source file)
-    - [ ] 2.4.3 Reflect trim in timeline visual (adjust clip width)
-    - [ ] 2.4.4 Apply trim in preview player (set video currentTime range)
-  - [ ] 2.5 **Export Pipeline**
-    - [ ] 2.5.1 Create ExportDialog component with file save dialog
-    - [ ] 2.5.2 Create ffmpeg service wrapper (use fluent-ffmpeg or direct CLI calls)
-    - [ ] 2.5.3 Implement IPC handler for FFmpeg export (runs in main process)
-    - [ ] 2.5.4 Build FFmpeg command: concatenate clips, apply trims, encode to H.264 MP4
-    - [ ] 2.5.5 Show export progress (parse FFmpeg output for progress percentage)
-    - [ ] 2.5.6 Test exported file plays in VLC and QuickTime
-    - [ ] 2.5.7 Handle export errors gracefully (show user-friendly error messages)
+- [x] **2.0 MVP Core Features (Import, Timeline, Preview, Trim, Export)** 🔴 Day 1
+  - [x] 2.1 **File Import**
+    - [x] 2.1.1 Create MediaLibrary component with drag-and-drop zone
+    - [x] 2.1.2 Add file picker dialog (MP4/MOV filter)
+    - [x] 2.1.3 Validate imported files (check if video is readable)
+    - [x] 2.1.4 Extract video metadata (duration, resolution, codec) using video element or FFprobe
+    - [x] 2.1.5 Add imported clips to Zustand timeline store
+  - [x] 2.2 **Timeline View**
+    - [x] 2.2.1 Create Timeline component with horizontal scrollable container
+    - [x] 2.2.2 Create TimelineClip component (visual block with thumbnail, duration label)
+    - [x] 2.2.3 Display clips on timeline proportional to their duration
+    - [x] 2.2.4 Add time markers/ruler (show seconds/minutes)
+    - [x] 2.2.5 Implement playhead indicator (vertical line showing current position)
+  - [x] 2.3 **Video Preview Player**
+    - [x] 2.3.1 Create VideoPreview component using HTML5 `<video>` element
+    - [x] 2.3.2 Implement play/pause/stop controls
+    - [x] 2.3.3 Load selected clip into preview player
+    - [x] 2.3.4 Sync playhead position with video currentTime
+  - [x] 2.4 **Trim Functionality**
+    - [x] 2.4.1 Add in/out point UI controls (buttons or handles on timeline clip)
+    - [x] 2.4.2 Update clip trim data in store (store in/out timestamps, don't modify source file)
+    - [x] 2.4.3 Reflect trim in timeline visual (adjust clip width)
+    - [x] 2.4.4 Apply trim in preview player (set video currentTime range)
+  - [x] 2.5 **Export Pipeline**
+    - [x] 2.5.1 Create ExportDialog component with file save dialog
+    - [x] 2.5.2 Create ffmpeg service wrapper (use fluent-ffmpeg or direct CLI calls)
+    - [x] 2.5.3 Implement IPC handler for FFmpeg export (runs in main process)
+    - [x] 2.5.4 Build FFmpeg command: concatenate clips, apply trims, encode to H.264 MP4
+    - [x] 2.5.5 Show export progress (parse FFmpeg output for progress percentage)
+    - [x] 2.5.6 Test exported file plays in VLC and QuickTime
+    - [x] 2.5.7 Handle export errors gracefully (show user-friendly error messages)
 
 - [ ] **3.0 MVP Packaging & Initial Testing** 🔴 Day 1
   - [ ] 3.1 Run production build (`npm run build`)
