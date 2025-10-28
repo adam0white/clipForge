@@ -1,7 +1,7 @@
-import { ipcMain, dialog, BrowserWindow } from 'electron'
+import { ipcMain, dialog, BrowserWindow, desktopCapturer } from 'electron'
 import path from 'node:path'
 import fs from 'node:fs/promises'
-import { IPC_CHANNELS, ExportRequest, ProjectFile } from '../src/types'
+import { IPC_CHANNELS, ExportRequest, ProjectFile, DesktopCapturerSource } from '../src/types'
 import { exportVideo } from './services/ffmpeg'
 
 /**
@@ -64,12 +64,6 @@ export function setupIpcHandlers() {
 
   // FFmpeg export handler
   ipcMain.handle(IPC_CHANNELS.FFMPEG_EXPORT, async (event, exportRequest: ExportRequest) => {
-    console.log('FFmpeg export requested:', {
-      clipCount: exportRequest.clips.length,
-      resolution: exportRequest.settings.resolution,
-      outputPath: exportRequest.settings.outputPath,
-    })
-    
     try {
       const mainWindow = BrowserWindow.fromWebContents(event.sender)
       
@@ -126,8 +120,6 @@ export function setupIpcHandlers() {
         'utf-8'
       )
 
-      console.log('Project saved successfully:', result.filePath)
-
       return {
         success: true,
         filePath: result.filePath,
@@ -167,8 +159,6 @@ export function setupIpcHandlers() {
         throw new Error('Invalid project file format')
       }
 
-      console.log('Project loaded successfully:', filePath)
-
       return {
         success: true,
         data: projectData,
@@ -179,6 +169,68 @@ export function setupIpcHandlers() {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown load error',
+      }
+    }
+  })
+
+  // Recording: Get desktop sources (screen/window capture)
+  ipcMain.handle(IPC_CHANNELS.RECORDING_GET_SOURCES, async () => {
+    try {
+      // Get available desktop sources (screens and windows)
+      const sources = await desktopCapturer.getSources({
+        types: ['window', 'screen'],
+        thumbnailSize: { width: 300, height: 200 },
+      })
+
+      // Convert to our format
+      const formattedSources: DesktopCapturerSource[] = sources.map(source => ({
+        id: source.id,
+        name: source.name,
+        thumbnail: source.thumbnail.toDataURL(),
+        display_id: source.display_id,
+        appIcon: source.appIcon?.toDataURL(),
+      }))
+
+      return {
+        success: true,
+        sources: formattedSources,
+      }
+    } catch (error) {
+      console.error('Failed to get desktop sources:', error)
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      }
+    }
+  })
+
+  // Recording: Save temp recording file
+  ipcMain.handle(IPC_CHANNELS.RECORDING_SAVE_TEMP, async (_, buffer: ArrayBuffer, filename: string) => {
+    try {
+      const { app } = await import('electron')
+      const os = await import('node:os')
+      
+      // Create temp directory path
+      const tempDir = path.join(os.tmpdir(), 'clipforge-recordings')
+      
+      // Ensure directory exists
+      await fs.mkdir(tempDir, { recursive: true })
+      
+      // Create full file path
+      const filePath = path.join(tempDir, filename)
+      
+      // Write buffer to file
+      await fs.writeFile(filePath, Buffer.from(buffer))
+      
+      return {
+        success: true,
+        filePath,
+      }
+    } catch (error) {
+      console.error('Failed to save temp recording:', error)
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
       }
     }
   })

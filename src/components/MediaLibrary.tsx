@@ -68,7 +68,6 @@ export function MediaLibrary({ onImport }: MediaLibraryProps) {
             if (projectData.version && projectData.timeline) {
               loadProject(projectData)
               setProjectFilePath(projectFile)
-              console.log('Project loaded from drag-and-drop:', projectFile)
             } else {
               alert('Invalid project file format. Missing required fields.')
             }

@@ -3,9 +3,10 @@ import { MediaLibrary } from './components/MediaLibrary'
 import { Timeline } from './components/Timeline'
 import { VideoPreview } from './components/VideoPreview'
 import { ExportDialog } from './components/ExportDialog'
+import { RecordingControls } from './components/RecordingControls'
 import { useCallback, useState } from 'react'
 import { useTimelineStore } from './store/timelineStore'
-import { Clip } from './types'
+import { Clip, VideoMetadata } from './types'
 import { isVideoFile, extractAllVideoData, getFileName } from './utils/videoUtils'
 
 function App() {
@@ -19,7 +20,7 @@ function App() {
   const setProjectFilePath = useTimelineStore((state) => state.setProjectFilePath)
   const projectName = useTimelineStore((state) => state.projectName)
 
-  const handleImport = useCallback(async (filePaths: string[]) => {
+  const handleImport = useCallback(async (filePaths: string[] | { filePath: string; duration: number }[]) => {
     setIsProcessing(true)
     
     try {
@@ -32,7 +33,12 @@ function App() {
         ? Math.max(...existingClips.map(c => c.startTime + (c.trimEnd - c.trimStart)))
         : 0
 
-      for (const filePath of filePaths) {
+      // Normalize input to array of objects
+      const files = filePaths.map(item => 
+        typeof item === 'string' ? { filePath: item, duration: undefined } : item
+      )
+
+      for (const { filePath, duration: providedDuration } of files) {
         // 2.1.3: Validate imported files
         if (!isVideoFile(filePath)) {
           console.warn('Skipping unsupported file:', filePath)
@@ -43,12 +49,30 @@ function App() {
           // 2.1.4: Extract video metadata (optimized - single video element)
           const videoData = await extractAllVideoData(filePath)
 
+          let duration: number
+          let metadata: VideoMetadata
+          let thumbnail: string | null
+
           if (!videoData) {
-            console.error('Failed to extract metadata for:', filePath)
-            continue
+            // If video element failed, use provided duration (for WebM recordings)
+            if (providedDuration) {
+              duration = providedDuration
+              metadata = { width: 1920, height: 1080, codec: 'vp9', frameRate: 30 }
+              thumbnail = null
+            } else {
+              console.error('Failed to extract metadata for:', filePath)
+              continue
+            }
+          } else {
+            // Check if duration is valid, use provided duration as fallback
+            if (!isFinite(videoData.duration) && providedDuration) {
+              duration = providedDuration
+            } else {
+              duration = videoData.duration
+            }
+            metadata = videoData.metadata
+            thumbnail = videoData.thumbnail
           }
-          
-          const { duration, metadata, thumbnail } = videoData
 
           // Add to library (deduplicated automatically)
           addToLibrary({
@@ -93,7 +117,6 @@ function App() {
       
       if (result.success && result.filePath) {
         setProjectFilePath(result.filePath)
-        console.log('Project saved successfully:', result.filePath)
       } else if (!result.canceled) {
         console.error('Failed to save project:', result.error)
         alert(`Failed to save project: ${result.error || 'Unknown error'}`)
@@ -113,7 +136,6 @@ function App() {
         if (result.filePath) {
           setProjectFilePath(result.filePath)
         }
-        console.log('Project loaded successfully')
       } else if (!result.canceled) {
         console.error('Failed to load project:', result.error)
         alert(`Failed to load project: ${result.error || 'Unknown error'}`)
@@ -174,6 +196,9 @@ function App() {
 
         {/* Preview & Timeline (Right) */}
         <main className="editor-area">
+          {/* Recording Controls */}
+          <RecordingControls onRecordingComplete={handleImport} />
+          
           {/* Video Preview */}
           <VideoPreview />
 

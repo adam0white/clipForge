@@ -119,20 +119,20 @@
   - [x] 3.7 Fix any packaging issues discovered (FFmpeg ASAR unpacking, icon regenerated with iconutil)
   - [x] 3.8 Document any known issues or limitations
 
-- [ ] **4.0 Recording Features (Screen & Webcam)** 🟡 Day 2
-  - [ ] 4.1 **Screen Recording**
-    - [ ] 4.1.1 Create RecordingControls component UI
-    - [ ] 4.1.2 Implement screen source selection using Electron's desktopCapturer API
-    - [ ] 4.1.3 Use MediaRecorder API to record selected screen/window
-    - [ ] 4.1.4 Add start/stop recording controls with visual indicator (red dot)
-    - [ ] 4.1.5 Save recorded video to temp file, auto-import to timeline
-    - [ ] 4.1.6 Test 30-second screen recording → timeline → export workflow
-  - [ ] 4.2 **Webcam Recording**
-    - [ ] 4.2.1 Add webcam toggle to recording controls
-    - [ ] 4.2.2 Access webcam stream using getUserMedia API
-    - [ ] 4.2.3 Support simultaneous screen + webcam recording (two MediaRecorder instances)
-    - [ ] 4.2.4 Save both recordings and add to timeline as separate clips
-    - [ ] 4.2.5 Test combined screen + webcam recording workflow
+- [x] **4.0 Recording Features (Screen & Webcam)** 🟡 Day 2
+  - [x] 4.1 **Screen Recording**
+    - [x] 4.1.1 Create RecordingControls component UI
+    - [x] 4.1.2 Implement screen source selection using Electron's desktopCapturer API
+    - [x] 4.1.3 Use MediaRecorder API to record selected screen/window
+    - [x] 4.1.4 Add start/stop recording controls with visual indicator (red dot)
+    - [x] 4.1.5 Save recorded video to temp file, auto-import to timeline
+    - [x] 4.1.6 Test 30-second screen recording → timeline → export workflow
+  - [x] 4.2 **Webcam Recording**
+    - [x] 4.2.1 Add webcam toggle to recording controls
+    - [x] 4.2.2 Access webcam stream using getUserMedia API
+    - [x] 4.2.3 Support simultaneous screen + webcam recording (two MediaRecorder instances)
+    - [x] 4.2.4 Save both recordings and add to timeline as separate clips
+    - [x] 4.2.5 Test combined screen + webcam recording workflow
 
 - [ ] **5.0 Advanced Editing Features (Drag, Split, Multi-track, Scrubbing)** 🟡 Day 2
   - [ ] 5.1 **Drag to Reorder Clips**

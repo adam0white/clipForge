@@ -31,7 +31,11 @@ export function VideoPreview() {
     
     // Add error handler to prevent infinite loop
     const handleError = (e: Event) => {
-      console.error('Video preview failed to load:', selectedClip.filePath)
+      // WebM files from recordings may not load immediately - this is often normal
+      const isWebM = selectedClip.filePath.toLowerCase().endsWith('.webm')
+      if (!isWebM) {
+        console.error('Video preview failed to load:', selectedClip.filePath)
+      }
       // Don't retry - just stop
       video.removeEventListener('error', handleError)
     }

@@ -1,6 +1,6 @@
 // TypeScript declarations for Electron IPC API exposed via preload
 
-import type { ProjectFile } from './index'
+import type { ProjectFile, DesktopCapturerSource } from './index'
 
 export interface ElectronAPI {
   // File operations
@@ -37,6 +37,18 @@ export interface ElectronAPI {
     data?: ProjectFile
     filePath?: string
     canceled?: boolean
+    error?: string
+  }>
+  
+  // Recording operations
+  getDesktopSources: () => Promise<{
+    success: boolean
+    sources?: DesktopCapturerSource[]
+    error?: string
+  }>
+  saveTempRecording: (buffer: ArrayBuffer, filename: string) => Promise<{
+    success: boolean
+    filePath?: string
     error?: string
   }>
 }

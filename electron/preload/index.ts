@@ -26,6 +26,11 @@ contextBridge.exposeInMainWorld('electron', {
   // Project operations
   saveProject: (projectData: any) => ipcRenderer.invoke('project:save', projectData),
   loadProject: () => ipcRenderer.invoke('project:load'),
+  
+  // Recording operations
+  getDesktopSources: () => ipcRenderer.invoke('recording:get-sources'),
+  saveTempRecording: (buffer: ArrayBuffer, filename: string) => 
+    ipcRenderer.invoke('recording:save-temp', buffer, filename),
 })
 
 // Legacy IPC renderer for backward compatibility

@@ -1,23 +1,24 @@
 # Active Context: ClipForge
 
 **Last Updated**: 2025-10-28
-**Phase**: Phase 3.0 Complete - MVP Packaged and Tested
+**Phase**: Phase 4.0 Complete - Screen & Webcam Recording
 
 ## Current Status
 
-✅ MVP complete and packaged! App builds to .dmg (126 MB), launches successfully, and complete workflow tested: import → timeline → trim → export. FFmpeg binary properly unpacked from ASAR. Valid icon generated and displaying.
+✅ Phase 4.0 complete! Screen recording with source picker, webcam recording with audio, simultaneous screen+webcam capture, proper video scaling/padding for export, and WebM metadata handling all working perfectly.
 
 ## Current Focus
 
-Ready for Phase 4.0 (Screen Recording) or final polish.
+Ready for Phase 5.0 (Advanced Timeline Features) or Phase 6.0 (Final Polish).
 
 ## Next Steps
 
 1. ✅ Phase 1.0: Project setup (Electron + React + TypeScript + FFmpeg)
 2. ✅ Phase 2.0: MVP core features (Import, Timeline, Preview, Trim, Export)
 3. ✅ Phase 3.0: MVP packaging and testing (.dmg build, install test)
-4. Phase 4.0: Screen recording (optional enhancement)
-5. Phase 5.0+: Advanced editing features
+4. ✅ Phase 4.0: Screen & webcam recording
+5. Phase 5.0: Advanced timeline features (drag-to-reorder, split, multi-track)
+6. Phase 6.0: Final polish and optimization
 
 ## Recent Decisions
 
@@ -41,6 +42,14 @@ Ready for Phase 4.0 (Screen Recording) or final polish.
 - **Build Output**: Signed .dmg (126 MB) and .zip (121 MB) for macOS arm64
 - **Testing**: Full workflow verified in packaged app (import, timeline, trim, export)
 
+**Phase 4:**
+- **Screen Recording**: Electron's desktopCapturer API with source picker modal showing thumbnails
+- **Webcam Recording**: getUserMedia API with audio enabled, 1280x720 target resolution
+- **Simultaneous Recording**: Two independent MediaRecorder instances (screen + webcam)
+- **WebM Duration Handling**: MediaRecorder creates WebM files without duration metadata - tracked client-side and passed to import
+- **Video Scaling**: FFmpeg scale+pad filter ensures all clips match target resolution (prevents stretching on export)
+- **Auto-Import**: Recordings saved to temp directory, automatically imported to timeline with correct duration
+
 ## Known Issues / Deferred Features
 
 **Working as designed (documented in systemPatterns.md):**
@@ -48,9 +57,10 @@ Ready for Phase 4.0 (Screen Recording) or final polish.
 - Gaps in timeline are removed during export (clips concatenated end-to-end)
 
 **Current limitations:**
-- Single track only (multi-track deferred to Phase 4+)
+- Single track only (multi-track deferred to Phase 5+)
 - No split/cut functionality yet (trim only)
 - No undo/redo (deferred to Phase 5+)
+- Clips cannot be dragged to reorder (deferred to Phase 5+)
 
 ## Blockers
 

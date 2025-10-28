@@ -62,7 +62,8 @@ export async function extractAllVideoData(filePath: string): Promise<{
         // Validate duration is a valid number
         const duration = video.duration
         if (!isFinite(duration) || duration <= 0) {
-          console.error('Invalid video duration:', duration, 'for file:', filePath)
+          // WebM files from MediaRecorder often lack duration metadata - this is expected
+          // Return null and let caller use provided duration fallback
           clearTimeout(timeoutId)
           cleanup()
           resolve(null)

@@ -11,7 +11,6 @@ let ffmpegPath = ffmpegInstaller.path
 if (ffmpegPath.includes('app.asar')) {
   ffmpegPath = ffmpegPath.replace('app.asar', 'app.asar.unpacked')
 }
-console.log('FFmpeg path:', ffmpegPath)
 ffmpeg.setFfmpegPath(ffmpegPath)
 
 /**
@@ -95,10 +94,7 @@ async function exportSingleClip(
           onProgress(percent)
         }
       })
-      .on('end', () => {
-        console.log('Export completed successfully')
-        resolve({ success: true })
-      })
+      .on('end', () => resolve({ success: true }))
       .on('error', (err) => {
         console.error('FFmpeg error:', err)
         resolve({ success: false, error: err.message })
@@ -122,8 +118,23 @@ async function exportMultipleClips(
     const concatListPath = path.join(tempDir, 'concat_list.txt')
     const intermediateFiles: string[] = []
 
-    // Step 1: Process each clip (trim and encode)
-    console.log('Processing clips...')
+    // Determine target resolution for all clips (width x height)
+    let targetWidth: number
+    let targetHeight: number
+    
+    if (settings.resolution === '1080p') {
+      targetWidth = 1920
+      targetHeight = 1080
+    } else if (settings.resolution === '720p') {
+      targetWidth = 1280
+      targetHeight = 720
+    } else {
+      // Use the first clip's resolution as the target (most common case)
+      targetWidth = clips[0]?.metadata?.width || 1920
+      targetHeight = clips[0]?.metadata?.height || 1080
+    }
+
+    // Step 1: Process each clip (trim, scale, and pad to consistent resolution)
     for (let i = 0; i < clips.length; i++) {
       const clip = clips[i]
       const intermediatePath = path.join(tempDir, `clip_${i}.mp4`)
@@ -133,6 +144,12 @@ async function exportMultipleClips(
         ffmpeg(clip.filePath)
           .setStartTime(clip.trimStart)
           .setDuration(clip.trimEnd - clip.trimStart)
+          // Scale to fit within target resolution while maintaining aspect ratio,
+          // then pad to exact target dimensions with black bars
+          .videoFilters([
+            `scale=${targetWidth}:${targetHeight}:force_original_aspect_ratio=decrease`,
+            `pad=${targetWidth}:${targetHeight}:(ow-iw)/2:(oh-ih)/2:black`
+          ])
           .videoCodec('libx264')
           .audioCodec('aac')
           .outputOptions(['-preset fast', '-crf 23'])
@@ -163,20 +180,12 @@ async function exportMultipleClips(
       .join('\n')
     await fs.writeFile(concatListPath, concatList, 'utf-8')
 
-    // Step 3: Concatenate all clips
-    console.log('Concatenating clips...')
+    // Step 3: Concatenate all clips (all clips are now same dimensions, so no scaling needed)
     const concatenateSuccess = await new Promise<boolean>((resolve) => {
-      const command = ffmpeg()
+      ffmpeg()
         .input(concatListPath)
         .inputOptions(['-f concat', '-safe 0'])
-
-      // Apply resolution settings
-      if (settings.resolution !== 'source') {
-        const height = settings.resolution === '1080p' ? 1080 : 720
-        command.size(`?x${height}`)
-      }
-
-      command
+        // No need to scale - all intermediate clips are already the same resolution
         .videoCodec('libx264')
         .audioCodec('aac')
         .outputOptions([
@@ -199,10 +208,7 @@ async function exportMultipleClips(
             onProgress(percent)
           }
         })
-        .on('end', () => {
-          console.log('Concatenation completed')
-          resolve(true)
-        })
+        .on('end', () => resolve(true))
         .on('error', (err) => {
           console.error('Concatenation error:', err)
           resolve(false)

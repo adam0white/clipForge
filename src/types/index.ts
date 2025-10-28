@@ -44,6 +44,15 @@ export interface ExportSettings {
   codec: 'h264'
 }
 
+// Desktop Capture Types
+export interface DesktopCapturerSource {
+  id: string
+  name: string
+  thumbnail: string // base64 data URL
+  display_id?: string
+  appIcon?: string
+}
+
 // IPC Channel names for type-safe communication
 export const IPC_CHANNELS = {
   FILE_IMPORT: 'file:import',
@@ -53,6 +62,8 @@ export const IPC_CHANNELS = {
   FFMPEG_EXPORT: 'ffmpeg:export',
   PROJECT_SAVE: 'project:save',
   PROJECT_LOAD: 'project:load',
+  RECORDING_GET_SOURCES: 'recording:get-sources',
+  RECORDING_SAVE_TEMP: 'recording:save-temp',
 } as const
 
 // IPC message types

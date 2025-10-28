@@ -330,6 +330,48 @@ export const config = {
 
 ## Project-Specific Patterns
 
+### Recording Features (Phase 4.0)
+
+**Screen Recording with Electron desktopCapturer**
+- `desktopCapturer.getSources()` provides screen/window sources with thumbnails
+- Sources include display_id for screen identification
+- Thumbnails converted to data URLs for UI display
+- Selected source ID passed to getUserMedia with `chromeMediaSource: 'desktop'` constraint
+- MediaRecorder with VP9 codec (`video/webm;codecs=vp9`) for efficient recording
+
+**Webcam Recording with Audio**
+- `getUserMedia({ audio: true, video: {...} })` for webcam access
+- Target resolution: 1280x720 (ideal constraints)
+- Audio enabled by default for webcam (not for screen - avoids feedback loops)
+- Separate MediaRecorder instance from screen recording
+
+**Simultaneous Recording Pattern**
+- Two independent MediaRecorder instances running in parallel
+- Separate chunk arrays for screen and webcam data
+- Both stopped simultaneously, processed sequentially
+- Each saved to temp directory with unique timestamp
+- Both auto-imported to timeline as separate clips
+
+**WebM Duration Metadata Handling**
+- MediaRecorder creates WebM files **without proper duration metadata**
+- HTML5 video element returns `duration: Infinity` for these files
+- Solution: Track recording duration client-side (timer in React state)
+- Pass duration alongside file path to import handler
+- Import handler uses provided duration when video element fails
+- Fallback metadata: { width: 1920, height: 1080, codec: 'vp9', frameRate: 30 }
+
+**Recording State Management**
+- `useRef` flag to prevent duplicate save operations (when both screen and webcam chunks update)
+- Capture chunks to local variables immediately, then clear state
+- Reset recording time after save completes (not when recording stops)
+- Timer runs during recording, paused value used for saving
+
+**Temp File Management**
+- Recordings saved to `os.tmpdir()/clipforge-recordings/`
+- Filename pattern: `screen-{timestamp}.webm` or `webcam-{timestamp}.webm`
+- Auto-import to timeline after save
+- Files persist until OS temp cleanup (user can trim/re-export later)
+
 ### Architecture Decisions
 
 **Custom Protocol for Video Files** (Official Electron Approach)
@@ -380,8 +422,25 @@ export const config = {
 4. Main process uses FFmpeg to:
    - Single clip: trim + encode directly
    - Multiple clips: process each → concat → encode
+   - **New (Phase 4)**: Scale+pad all clips to consistent resolution before concat
 5. Progress updates sent back to renderer
 6. On completion, save dialog returns file path
+
+**Recording Flow (Phase 4):**
+1. User selects "New Recording" → Source picker modal opens
+2. desktopCapturer.getSources() fetches screen/window list with thumbnails
+3. User selects source + optionally enables webcam
+4. Recording starts:
+   - Screen: getUserMedia with selected source ID
+   - Webcam (if enabled): getUserMedia with video+audio constraints
+   - Both: Two MediaRecorder instances, VP9 codec
+5. User stops recording:
+   - Both recorders stopped simultaneously
+   - Chunks converted to Blobs
+   - Saved to temp directory via IPC
+6. Auto-import:
+   - File paths + duration sent to import handler
+   - Clips added to timeline with correct metadata
 
 ### Performance Optimizations
 
@@ -399,6 +458,15 @@ export const config = {
 - HTML5 video element (hardware accelerated)
 - Trim enforcement via `currentTime` boundaries
 - Lightweight compared to Canvas rendering
+
+**FFmpeg Video Scaling (Phase 4):**
+- Problem: Mixed resolutions (e.g., 3440×1440 ultrawide + 1920×1080 standard + 1280×720 webcam) cause stretching
+- Solution: Two-step filter chain:
+  1. `scale=W:H:force_original_aspect_ratio=decrease` - Fit within target resolution
+  2. `pad=W:H:(ow-iw)/2:(oh-ih)/2:black` - Add centered black bars to exact dimensions
+- Target resolution determined by export settings or first clip's dimensions
+- All intermediate clips normalized **before** concatenation
+- Result: No stretching, proper aspect ratios maintained
 
 ### Known Limitations
 

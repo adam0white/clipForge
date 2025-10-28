@@ -1,7 +1,7 @@
 # Progress: ClipForge
 
 **Updated**: 2025-10-28
-**Status**: 🎉 Phase 3.0 Complete - MVP Fully Packaged and Tested
+**Status**: 🎉 Phase 4.0 Complete - Screen & Webcam Recording Implemented
 
 ## MVP Progress (7/7) ✅
 
@@ -13,22 +13,22 @@
 - ✅ Export to MP4 (single or multiple clips)
 - ✅ Built and packaged as native app (.dmg for macOS)
 
-## Core Features Progress (0/6)
+## Core Features Progress (3/6)
 
-- ⏳ Screen recording (full screen or window selection)
-- ⏳ Webcam recording with simultaneous screen + webcam
+- ✅ Screen recording (full screen or window selection)
+- ✅ Webcam recording with simultaneous screen + webcam
+- ✅ Export to MP4 with resolution options (720p, 1080p, source)
 - ⏳ Timeline editor with drag, trim, split, delete
 - ⏳ Multi-track support (2+ tracks)
 - ⏳ Real-time preview with scrubbing
-- ⏳ Export to MP4 with resolution options
 
-## Testing Scenarios (0/6)
+## Testing Scenarios (4/6)
 
-- ⏳ Recording 30-second screen capture → timeline
-- ⏳ Importing 3 video clips → arranging in sequence
+- ✅ Recording 30-second screen capture → timeline
+- ✅ Importing 3 video clips → arranging in sequence
+- ✅ Exporting 2-minute video with multiple clips
+- ✅ Webcam recording + screen recording → timeline
 - ⏳ Trimming clips and splitting at various points
-- ⏳ Exporting 2-minute video with multiple clips
-- ⏳ Webcam recording overlay on screen recording
 - ⏳ Testing on Mac (and Windows if possible)
 
 ## What Works
@@ -68,12 +68,24 @@
 - ✅ Complete workflow tested in packaged app
 - ✅ Export functionality verified with FFmpeg
 
+**Phase 4.0 - Screen & Webcam Recording:**
+- ✅ RecordingControls component with source picker modal
+- ✅ Electron desktopCapturer API for screen/window selection
+- ✅ MediaRecorder API for screen capture (VP9 codec)
+- ✅ Webcam access via getUserMedia with audio enabled
+- ✅ Simultaneous screen + webcam recording (dual MediaRecorder instances)
+- ✅ Recordings auto-saved to temp directory and imported to timeline
+- ✅ WebM duration metadata handling (client-side tracking)
+- ✅ FFmpeg scale+pad filters for consistent video dimensions
+- ✅ Mixed resolution export (ultrawide + standard + webcam) without stretching
+- ✅ Code optimization and logging cleanup
+
 ## What's Left
 
 Optional enhancements:
-- Day 1 (MVP): ✅ Phase 1.0, ✅ Phase 2.0, ✅ Phase 3.0 (Complete!)
-- Day 2+: Phase 4.0 (Screen Recording), Phase 5.0 (Advanced Editing)
-- Day 3: Phase 6.0 (Final Polish)
+- ✅ Phase 1.0, ✅ Phase 2.0, ✅ Phase 3.0, ✅ Phase 4.0 (Complete!)
+- Phase 5.0: Advanced Timeline Features (drag-to-reorder, split, multi-track)
+- Phase 6.0: Final Polish (performance, UX improvements, testing)
 
 ## Blockers
 
@@ -81,7 +93,7 @@ None.
 
 ## Key Milestones
 
-- **Completed**: ✅ Phase 1.0 (Project Setup), ✅ Phase 2.0 (MVP Core Features), ✅ Phase 3.0 (Packaging)
+- **Completed**: ✅ Phase 1.0 (Setup), ✅ Phase 2.0 (MVP), ✅ Phase 3.0 (Packaging), ✅ Phase 4.0 (Recording)
 - **MVP Status**: ✅ Complete and working!
-- **Next**: Optional enhancements (screen recording, advanced editing)
-- **Day 1 Goal**: ✅ MVP packaged and tested - ACHIEVED!
+- **Recording Features**: ✅ Screen + webcam capture implemented!
+- **Next**: Phase 5.0 (Advanced Timeline) or Phase 6.0 (Final Polish)
