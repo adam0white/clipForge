@@ -13,6 +13,8 @@ export function MediaLibrary({ onImport }: MediaLibraryProps) {
   const library = useTimelineStore((state) => state.library)
   const tracks = useTimelineStore((state) => state.tracks)
   const addClip = useTimelineStore((state) => state.addClip)
+  const loadProject = useTimelineStore((state) => state.loadProject)
+  const setProjectFilePath = useTimelineStore((state) => state.setProjectFilePath)
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -42,13 +44,47 @@ export function MediaLibrary({ onImport }: MediaLibraryProps) {
       // Use Electron's webUtils to get file paths from File objects
       const filePaths = files.map(file => window.electron.getPathForFile(file))
       
-      if (filePaths.length > 0) {
+      if (filePaths.length === 0) return
+      
+      // Check if any file is a project file (.cfproj or .json)
+      const projectFile = filePaths.find(path => 
+        path.endsWith('.cfproj') || path.endsWith('.json')
+      )
+      
+      if (projectFile) {
+        // Confirm before loading project (will replace current timeline)
+        const confirmed = confirm(
+          'Load this project? This will replace your current timeline.\n\n' +
+          'Make sure to save your current work if needed.'
+        )
+        
+        if (confirmed) {
+          try {
+            // Read the project file directly
+            const response = await fetch(`safe-file://${projectFile}`)
+            const projectData = await response.json()
+            
+            // Validate and load project
+            if (projectData.version && projectData.timeline) {
+              loadProject(projectData)
+              setProjectFilePath(projectFile)
+              console.log('Project loaded from drag-and-drop:', projectFile)
+            } else {
+              alert('Invalid project file format. Missing required fields.')
+            }
+          } catch (error) {
+            console.error('Failed to load project:', error)
+            alert(`Failed to load project: ${error instanceof Error ? error.message : 'Unknown error'}`)
+          }
+        }
+      } else {
+        // Regular video file import
         onImport(filePaths)
       }
     } catch (error) {
       console.error('[Drag&Drop] Error processing dropped files:', error)
     }
-  }, [onImport])
+  }, [onImport, loadProject, setProjectFilePath])
 
   const handleFilePickerClick = async () => {
     const result = await window.electron.showOpenDialog()
@@ -102,9 +138,9 @@ export function MediaLibrary({ onImport }: MediaLibraryProps) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
           </svg>
           <p className="drop-zone-text">
-            {isDragging ? 'Drop files here' : 'Drop video files here or click to browse'}
+            {isDragging ? 'Drop files here' : 'Drop video files or project (.cfproj) here'}
           </p>
-          <p className="drop-zone-hint">Supported: MP4, MOV, AVI, MKV, WebM</p>
+          <p className="drop-zone-hint">Videos: MP4, MOV, AVI, MKV, WebM | Projects: .cfproj, .json</p>
         </div>
       </div>
 

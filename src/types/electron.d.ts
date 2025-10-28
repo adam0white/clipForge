@@ -1,5 +1,7 @@
 // TypeScript declarations for Electron IPC API exposed via preload
 
+import type { ProjectFile } from './index'
+
 export interface ElectronAPI {
   // File operations
   showOpenDialog: () => Promise<{ canceled: boolean; filePaths: string[] }>
@@ -22,6 +24,21 @@ export interface ElectronAPI {
   
   // Event listeners
   onExportProgress: (callback: (progress: any) => void) => () => void
+  
+  // Project operations
+  saveProject: (projectData: ProjectFile) => Promise<{
+    success: boolean
+    filePath?: string
+    canceled?: boolean
+    error?: string
+  }>
+  loadProject: () => Promise<{
+    success: boolean
+    data?: ProjectFile
+    filePath?: string
+    canceled?: boolean
+    error?: string
+  }>
 }
 
 declare global {

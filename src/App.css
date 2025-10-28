@@ -53,9 +53,16 @@ body {
   margin: 0;
 }
 
+.project-name {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-left: 16px;
+}
+
 .header-controls {
   display: flex;
   gap: 10px;
+  margin-left: auto;
 }
 
 /* Buttons */
@@ -83,6 +90,18 @@ button:disabled {
 .btn-import,
 .btn-export {
   font-weight: 500;
+}
+
+.btn-secondary {
+  background-color: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
 }
 
 /* Main Content Area */

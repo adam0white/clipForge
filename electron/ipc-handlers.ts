@@ -1,7 +1,7 @@
 import { ipcMain, dialog, BrowserWindow } from 'electron'
 import path from 'node:path'
 import fs from 'node:fs/promises'
-import { IPC_CHANNELS, ExportRequest } from '../src/types'
+import { IPC_CHANNELS, ExportRequest, ProjectFile } from '../src/types'
 import { exportVideo } from './services/ffmpeg'
 
 /**
@@ -94,6 +94,91 @@ export function setupIpcHandlers() {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown export error',
+      }
+    }
+  })
+
+  // Project save handler - saves project as JSON file
+  ipcMain.handle(IPC_CHANNELS.PROJECT_SAVE, async (_, projectData: ProjectFile) => {
+    try {
+      const result = await dialog.showSaveDialog({
+        defaultPath: `${projectData.name || 'Untitled'}.cfproj`,
+        filters: [
+          { name: 'ClipForge Project', extensions: ['cfproj'] },
+          { name: 'JSON File', extensions: ['json'] },
+        ],
+      })
+
+      if (result.canceled || !result.filePath) {
+        return { success: false, canceled: true }
+      }
+
+      // Update the updatedAt timestamp
+      const updatedProject: ProjectFile = {
+        ...projectData,
+        updatedAt: new Date().toISOString(),
+      }
+
+      // Write project file with pretty formatting (human-readable)
+      await fs.writeFile(
+        result.filePath,
+        JSON.stringify(updatedProject, null, 2),
+        'utf-8'
+      )
+
+      console.log('Project saved successfully:', result.filePath)
+
+      return {
+        success: true,
+        filePath: result.filePath,
+      }
+    } catch (error) {
+      console.error('Failed to save project:', error)
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown save error',
+      }
+    }
+  })
+
+  // Project load handler - loads project from JSON file
+  ipcMain.handle(IPC_CHANNELS.PROJECT_LOAD, async () => {
+    try {
+      const result = await dialog.showOpenDialog({
+        properties: ['openFile'],
+        filters: [
+          { name: 'ClipForge Project', extensions: ['cfproj', 'json'] },
+          { name: 'All Files', extensions: ['*'] },
+        ],
+      })
+
+      if (result.canceled || result.filePaths.length === 0) {
+        return { success: false, canceled: true }
+      }
+
+      const filePath = result.filePaths[0]
+      const fileContent = await fs.readFile(filePath, 'utf-8')
+      
+      // Parse and validate project file
+      const projectData: ProjectFile = JSON.parse(fileContent)
+      
+      // Basic validation
+      if (!projectData.version || !projectData.timeline) {
+        throw new Error('Invalid project file format')
+      }
+
+      console.log('Project loaded successfully:', filePath)
+
+      return {
+        success: true,
+        data: projectData,
+        filePath,
+      }
+    } catch (error) {
+      console.error('Failed to load project:', error)
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown load error',
       }
     }
   })

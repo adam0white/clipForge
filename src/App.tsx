@@ -14,6 +14,10 @@ function App() {
   const addClip = useTimelineStore((state) => state.addClip)
   const addToLibrary = useTimelineStore((state) => state.addToLibrary)
   const tracks = useTimelineStore((state) => state.tracks)
+  const getProjectData = useTimelineStore((state) => state.getProjectData)
+  const loadProject = useTimelineStore((state) => state.loadProject)
+  const setProjectFilePath = useTimelineStore((state) => state.setProjectFilePath)
+  const projectName = useTimelineStore((state) => state.projectName)
 
   const handleImport = useCallback(async (filePaths: string[]) => {
     setIsProcessing(true)
@@ -82,12 +86,66 @@ function App() {
     }
   }, [addClip, addToLibrary, tracks])
 
+  const handleSaveProject = useCallback(async () => {
+    try {
+      const projectData = getProjectData()
+      const result = await window.electron.saveProject(projectData)
+      
+      if (result.success && result.filePath) {
+        setProjectFilePath(result.filePath)
+        console.log('Project saved successfully:', result.filePath)
+      } else if (!result.canceled) {
+        console.error('Failed to save project:', result.error)
+        alert(`Failed to save project: ${result.error || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Save project error:', error)
+      alert(`Failed to save project: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }, [getProjectData, setProjectFilePath])
+
+  const handleLoadProject = useCallback(async () => {
+    try {
+      const result = await window.electron.loadProject()
+      
+      if (result.success && result.data) {
+        loadProject(result.data)
+        if (result.filePath) {
+          setProjectFilePath(result.filePath)
+        }
+        console.log('Project loaded successfully')
+      } else if (!result.canceled) {
+        console.error('Failed to load project:', result.error)
+        alert(`Failed to load project: ${result.error || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Load project error:', error)
+      alert(`Failed to load project: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }, [loadProject, setProjectFilePath])
+
   return (
     <div className="app-container">
       {/* Header */}
       <header className="app-header">
         <h1 className="app-title">ClipForge</h1>
+        <div className="project-name">{projectName}</div>
         <div className="header-controls">
+          <button 
+            className="btn-secondary"
+            onClick={handleLoadProject}
+            title="Load Project"
+          >
+            Open Project
+          </button>
+          <button 
+            className="btn-secondary"
+            onClick={handleSaveProject}
+            disabled={tracks.flatMap(t => t.clips).length === 0}
+            title="Save Project"
+          >
+            Save Project
+          </button>
           <button 
             className="btn-import"
             onClick={async () => {

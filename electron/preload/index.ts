@@ -22,6 +22,10 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer.on('ffmpeg:progress', listener)
     return () => ipcRenderer.removeListener('ffmpeg:progress', listener)
   },
+  
+  // Project operations
+  saveProject: (projectData: any) => ipcRenderer.invoke('project:save', projectData),
+  loadProject: () => ipcRenderer.invoke('project:load'),
 })
 
 // Legacy IPC renderer for backward compatibility

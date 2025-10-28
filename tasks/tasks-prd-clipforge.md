@@ -102,6 +102,11 @@
     - [x] 2.5.5 Show export progress (parse FFmpeg output for progress percentage)
     - [x] 2.5.6 Test exported file plays in VLC and QuickTime
     - [x] 2.5.7 Handle export errors gracefully (show user-friendly error messages)
+  - [x] 2.6 **Project Save/Load**
+    - [x] 2.6.1 Define project file format (JSON schema with .cfproj extension)
+    - [x] 2.6.2 Add IPC handlers for save/load project files
+    - [x] 2.6.3 Add loadProject() and getProjectData() actions to Zustand store
+    - [x] 2.6.4 Add Save/Load Project buttons to App UI
 
 - [ ] **3.0 MVP Packaging & Initial Testing** 🔴 Day 1
   - [ ] 3.1 Run production build (`npm run build`)

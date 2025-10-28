@@ -51,6 +51,8 @@ export const IPC_CHANNELS = {
   VIDEO_METADATA: 'video:metadata',
   FFMPEG_PROGRESS: 'ffmpeg:progress',
   FFMPEG_EXPORT: 'ffmpeg:export',
+  PROJECT_SAVE: 'project:save',
+  PROJECT_LOAD: 'project:load',
 } as const
 
 // IPC message types
@@ -68,5 +70,47 @@ export interface ExportProgress {
   currentClip: number
   totalClips: number
   message: string
+}
+
+// Project file format for save/load functionality
+export interface ProjectFile {
+  version: string // Schema version for future compatibility
+  name: string // Project name
+  createdAt: string // ISO timestamp
+  updatedAt: string // ISO timestamp
+  timeline: {
+    tracks: ProjectTrack[]
+    playheadPosition: number
+    zoom: number
+    duration: number
+  }
+  library: ProjectLibraryItem[]
+}
+
+export interface ProjectTrack {
+  id: string
+  name: string
+  clips: ProjectClip[]
+  isVisible: boolean
+  isMuted: boolean
+}
+
+export interface ProjectClip {
+  id: string
+  name: string
+  filePath: string
+  duration: number
+  startTime: number
+  trimStart: number
+  trimEnd: number
+  trackId: string
+  metadata?: VideoMetadata
+}
+
+export interface ProjectLibraryItem {
+  filePath: string
+  name: string
+  duration: number
+  metadata: any
 }
 

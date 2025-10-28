@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { Clip, Track, TimelineState } from '@/types'
+import { Clip, Track, TimelineState, ProjectFile } from '@/types'
 
 // Library item represents an imported video file
 export interface LibraryItem {
@@ -13,6 +13,10 @@ export interface LibraryItem {
 interface TimelineStore extends TimelineState {
   // Library (imported video files, independent of timeline)
   library: LibraryItem[]
+  
+  // Project metadata
+  projectName: string
+  projectFilePath: string | null
   
   // Actions
   addClip: (clip: Clip) => void
@@ -28,11 +32,17 @@ interface TimelineStore extends TimelineState {
   // Library actions
   addToLibrary: (item: LibraryItem) => void
   removeFromLibrary: (filePath: string) => void
+  
+  // Project actions
+  setProjectName: (name: string) => void
+  setProjectFilePath: (path: string | null) => void
+  loadProject: (projectData: ProjectFile) => void
+  getProjectData: () => ProjectFile
 }
 
 const DEFAULT_TRACK_ID = 'track-1'
 
-export const useTimelineStore = create<TimelineStore>((set) => ({
+export const useTimelineStore = create<TimelineStore>((set, get) => ({
   // Initial state
   tracks: [
     {
@@ -48,6 +58,8 @@ export const useTimelineStore = create<TimelineStore>((set) => ({
   selectedClipId: null,
   zoom: 20, // pixels per second
   duration: 0,
+  projectName: 'Untitled Project',
+  projectFilePath: null,
 
   // Actions
   addClip: (clip) =>
@@ -136,5 +148,74 @@ export const useTimelineStore = create<TimelineStore>((set) => ({
     set((state) => ({
       library: state.library.filter(item => item.filePath !== filePath),
     })),
+  
+  // Project actions
+  setProjectName: (name) => set({ projectName: name }),
+  
+  setProjectFilePath: (path) => set({ projectFilePath: path }),
+  
+  loadProject: (projectData) => {
+    // Restore complete timeline state from project file
+    set({
+      tracks: projectData.timeline.tracks.map(track => ({
+        ...track,
+        // Ensure clips don't have thumbnails (will be regenerated if needed)
+        clips: track.clips.map(clip => ({
+          ...clip,
+          thumbnail: undefined, // Thumbnails not saved in project file
+        })),
+      })),
+      library: projectData.library,
+      playheadPosition: projectData.timeline.playheadPosition,
+      zoom: projectData.timeline.zoom,
+      duration: projectData.timeline.duration,
+      projectName: projectData.name,
+      selectedClipId: null, // Reset selection on load
+    })
+  },
+  
+  getProjectData: () => {
+    const state = get()
+    
+    // Create project file data structure
+    const projectData: ProjectFile = {
+      version: '1.0.0',
+      name: state.projectName,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      timeline: {
+        tracks: state.tracks.map(track => ({
+          id: track.id,
+          name: track.name,
+          isVisible: track.isVisible,
+          isMuted: track.isMuted,
+          clips: track.clips.map(clip => ({
+            id: clip.id,
+            name: clip.name,
+            filePath: clip.filePath,
+            duration: clip.duration,
+            startTime: clip.startTime,
+            trimStart: clip.trimStart,
+            trimEnd: clip.trimEnd,
+            trackId: clip.trackId,
+            metadata: clip.metadata,
+            // Explicitly exclude thumbnail (too large for project file)
+          })),
+        })),
+        playheadPosition: state.playheadPosition,
+        zoom: state.zoom,
+        duration: state.duration,
+      },
+      library: state.library.map(item => ({
+        filePath: item.filePath,
+        name: item.name,
+        duration: item.duration,
+        metadata: item.metadata,
+        // Explicitly exclude thumbnail
+      })),
+    }
+    
+    return projectData
+  },
 }))
 
