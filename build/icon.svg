@@ -1,0 +1,54 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="512" height="512" rx="128" fill="url(#gradient)"/>
+  
+  <!-- Film strip frame -->
+  <g transform="translate(96, 96)">
+    <!-- Outer frame -->
+    <rect x="0" y="0" width="320" height="320" rx="24" fill="#1a1a1a" stroke="#fff" stroke-width="8"/>
+    
+    <!-- Film sprocket holes (left side) -->
+    <rect x="16" y="40" width="24" height="32" rx="4" fill="#fff"/>
+    <rect x="16" y="120" width="24" height="32" rx="4" fill="#fff"/>
+    <rect x="16" y="200" width="24" height="32" rx="4" fill="#fff"/>
+    <rect x="16" y="280" width="24" height="32" rx="4" fill="#fff"/>
+    
+    <!-- Film sprocket holes (right side) -->
+    <rect x="280" y="40" width="24" height="32" rx="4" fill="#fff"/>
+    <rect x="280" y="120" width="24" height="32" rx="4" fill="#fff"/>
+    <rect x="280" y="200" width="24" height="32" rx="4" fill="#fff"/>
+    <rect x="280" y="280" width="24" height="32" rx="4" fill="#fff"/>
+    
+    <!-- Center frame (video preview area) -->
+    <rect x="56" y="56" width="208" height="208" rx="12" fill="#2a2a2a"/>
+    
+    <!-- Timeline/cut mark (distinctive ClipForge element) -->
+    <g transform="translate(80, 160)">
+      <!-- Timeline track -->
+      <rect x="0" y="0" width="160" height="8" rx="4" fill="url(#timelineGradient)"/>
+      
+      <!-- Playhead/cut indicator -->
+      <path d="M 80 -12 L 80 20 M 70 -8 L 80 -16 L 90 -8" 
+            stroke="#4A9EFF" 
+            stroke-width="6" 
+            stroke-linecap="round" 
+            stroke-linejoin="round" 
+            fill="none"/>
+    </g>
+  </g>
+  
+  <!-- Gradients -->
+  <defs>
+    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2563EB;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1E40AF;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="timelineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#4A9EFF;stop-opacity:0.4" />
+      <stop offset="50%" style="stop-color:#4A9EFF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4A9EFF;stop-opacity:0.4" />
+    </linearGradient>
+  </defs>
+</svg>
+

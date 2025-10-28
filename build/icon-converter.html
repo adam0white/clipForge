@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClipForge Icon Converter</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #1a1a1a;
+      color: #fff;
+    }
+    h1 { color: #4A9EFF; }
+    #preview { 
+      margin: 20px 0;
+      padding: 20px;
+      background: #2a2a2a;
+      border-radius: 12px;
+      text-align: center;
+    }
+    canvas {
+      border: 1px solid #444;
+      background: #fff;
+      border-radius: 8px;
+    }
+    button {
+      background: #4A9EFF;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      font-size: 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      margin: 10px 5px;
+    }
+    button:hover { background: #3A8EEF; }
+    .info {
+      background: #2a2a2a;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 20px 0;
+      border-left: 4px solid #4A9EFF;
+    }
+  </style>
+</head>
+<body>
+  <h1>ClipForge Icon Converter</h1>
+  <p>Convert the SVG icon to PNG at various resolutions for Electron app icons.</p>
+  
+  <div id="preview">
+    <h3>Preview (512x512)</h3>
+    <canvas id="canvas" width="512" height="512"></canvas>
+  </div>
+  
+  <div style="text-align: center;">
+    <button onclick="downloadIcon(512, 'icon-512')">Download 512x512</button>
+    <button onclick="downloadIcon(1024, 'icon-1024')">Download 1024x1024</button>
+    <button onclick="downloadIcon(256, 'icon-256')">Download 256x256</button>
+  </div>
+  
+  <div class="info">
+    <h3>Next Steps:</h3>
+    <ol>
+      <li>Download the 1024x1024 PNG (for best quality)</li>
+      <li>Install electron-icon-maker: <code>npm install --save-dev electron-icon-maker</code></li>
+      <li>Generate icons: <code>npx electron-icon-maker --input=./build/icon-1024.png --output=./build</code></li>
+      <li>Or manually save the 512x512 as icon.png for a quick test</li>
+    </ol>
+  </div>
+
+  <script>
+    const svgCode = `
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="512" height="512" rx="128" fill="url(#gradient)"/>
+  
+  <!-- Film strip frame -->
+  <g transform="translate(96, 96)">
+    <!-- Outer frame -->
+    <rect x="0" y="0" width="320" height="320" rx="24" fill="#1a1a1a" stroke="#fff" stroke-width="8"/>
+    
+    <!-- Film sprocket holes (left side) -->
+    <rect x="16" y="40" width="24" height="32" rx="4" fill="#fff"/>
+    <rect x="16" y="120" width="24" height="32" rx="4" fill="#fff"/>
+    <rect x="16" y="200" width="24" height="32" rx="4" fill="#fff"/>
+    <rect x="16" y="280" width="24" height="32" rx="4" fill="#fff"/>
+    
+    <!-- Film sprocket holes (right side) -->
+    <rect x="280" y="40" width="24" height="32" rx="4" fill="#fff"/>
+    <rect x="280" y="120" width="24" height="32" rx="4" fill="#fff"/>
+    <rect x="280" y="200" width="24" height="32" rx="4" fill="#fff"/>
+    <rect x="280" y="280" width="24" height="32" rx="4" fill="#fff"/>
+    
+    <!-- Center frame (video preview area) -->
+    <rect x="56" y="56" width="208" height="208" rx="12" fill="#2a2a2a"/>
+    
+    <!-- Timeline/cut mark (distinctive ClipForge element) -->
+    <g transform="translate(80, 160)">
+      <!-- Timeline track -->
+      <rect x="0" y="0" width="160" height="8" rx="4" fill="url(#timelineGradient)"/>
+      
+      <!-- Playhead/cut indicator -->
+      <path d="M 80 -12 L 80 20 M 70 -8 L 80 -16 L 90 -8" 
+            stroke="#4A9EFF" 
+            stroke-width="6" 
+            stroke-linecap="round" 
+            stroke-linejoin="round" 
+            fill="none"/>
+    </g>
+  </g>
+  
+  <!-- Gradients -->
+  <defs>
+    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2563EB;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1E40AF;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="timelineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#4A9EFF;stop-opacity:0.4" />
+      <stop offset="50%" style="stop-color:#4A9EFF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4A9EFF;stop-opacity:0.4" />
+    </linearGradient>
+  </defs>
+</svg>
+    `.trim();
+
+    function renderSVGToCanvas(size) {
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      
+      const img = new Image();
+      const svgBlob = new Blob([svgCode], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(svgBlob);
+      
+      return new Promise((resolve, reject) => {
+        img.onload = function() {
+          ctx.drawImage(img, 0, 0, size, size);
+          URL.revokeObjectURL(url);
+          resolve(canvas);
+        };
+        img.onerror = reject;
+        img.src = url;
+      });
+    }
+
+    // Render preview on page load
+    window.onload = async function() {
+      const previewCanvas = document.getElementById('canvas');
+      const tempCanvas = await renderSVGToCanvas(512);
+      const ctx = previewCanvas.getContext('2d');
+      ctx.drawImage(tempCanvas, 0, 0);
+    };
+
+    async function downloadIcon(size, filename) {
+      const canvas = await renderSVGToCanvas(size);
+      const link = document.createElement('a');
+      link.download = `${filename}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+  </script>
+</body>
+</html>
+

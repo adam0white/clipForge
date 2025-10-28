@@ -107,6 +107,7 @@
     - [x] 2.6.2 Add IPC handlers for save/load project files
     - [x] 2.6.3 Add loadProject() and getProjectData() actions to Zustand store
     - [x] 2.6.4 Add Save/Load Project buttons to App UI
+  - [x] 2.7 **Project Icon**
 
 - [ ] **3.0 MVP Packaging & Initial Testing** 🔴 Day 1
   - [ ] 3.1 Run production build (`npm run build`)
