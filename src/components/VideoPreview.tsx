@@ -12,6 +12,7 @@ export function VideoPreview() {
   const tracks = useTimelineStore((state) => state.tracks)
   const selectedClipId = useTimelineStore((state) => state.selectedClipId)
   const setPlayheadPosition = useTimelineStore((state) => state.setPlayheadPosition)
+  const playheadPosition = useTimelineStore((state) => state.playheadPosition)
   
   // Get all clips sorted by timeline position
   const allClips = tracks
@@ -52,6 +53,39 @@ export function VideoPreview() {
       video.removeEventListener('error', handleError)
     }
   }, [selectedClip])
+  
+  // Sync video with playhead position (for scrubbing)
+  useEffect(() => {
+    if (!videoRef.current || !selectedClip || isPlaying) return
+    
+    // Find which clip the playhead is currently on
+    const currentClip = allClips.find(
+      clip => playheadPosition >= clip.startTime && 
+              playheadPosition < clip.startTime + (clip.trimEnd - clip.trimStart)
+    )
+    
+    if (currentClip && currentClip.id === selectedClip.id) {
+      // Playhead is on the selected clip - seek to the correct position
+      const clipRelativeTime = playheadPosition - currentClip.startTime
+      const videoTime = currentClip.trimStart + clipRelativeTime
+      
+      if (Math.abs(videoRef.current.currentTime - videoTime) > 0.1) {
+        videoRef.current.currentTime = videoTime
+        setCurrentTime(videoTime)
+      }
+    } else if (currentClip && currentClip.id !== selectedClip.id) {
+      // Playhead moved to a different clip - switch to it
+      const video = videoRef.current
+      video.src = `safe-file:///${currentClip.filePath}`
+      
+      const clipRelativeTime = playheadPosition - currentClip.startTime
+      const videoTime = currentClip.trimStart + clipRelativeTime
+      video.currentTime = videoTime
+      setCurrentTime(videoTime)
+      
+      useTimelineStore.getState().setSelectedClip(currentClip.id)
+    }
+  }, [playheadPosition, selectedClip, allClips, isPlaying])
   
   // Update current time
   const handleTimeUpdate = useCallback(() => {

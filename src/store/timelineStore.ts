@@ -22,6 +22,7 @@ interface TimelineStore extends TimelineState {
   addClip: (clip: Clip) => void
   removeClip: (clipId: string) => void
   updateClip: (clipId: string, updates: Partial<Clip>) => void
+  splitClip: (clipId: string, splitTime: number) => void
   addTrack: (track: Track) => void
   removeTrack: (trackId: string) => void
   setPlayheadPosition: (position: number) => void
@@ -98,6 +99,72 @@ export const useTimelineStore = create<TimelineStore>((set, get) => ({
         ),
       })),
     })),
+
+  splitClip: (clipId, splitTime) =>
+    set((state) => {
+      // Find the clip to split
+      let clipToSplit: Clip | null = null
+      let trackId: string | null = null
+      
+      for (const track of state.tracks) {
+        const clip = track.clips.find((c) => c.id === clipId)
+        if (clip) {
+          clipToSplit = clip
+          trackId = track.id
+          break
+        }
+      }
+      
+      if (!clipToSplit || !trackId) return state
+      
+      // Calculate split point relative to the clip's timeline position
+      // splitTime is absolute timeline position, convert to video time
+      const clipVideoTime = splitTime - clipToSplit.startTime + clipToSplit.trimStart
+      
+      // Validate split point is within clip bounds
+      if (
+        clipVideoTime <= clipToSplit.trimStart || 
+        clipVideoTime >= clipToSplit.trimEnd
+      ) {
+        // Split point outside clip bounds, do nothing
+        return state
+      }
+      
+      // Create two new clips
+      const clip1: Clip = {
+        ...clipToSplit,
+        id: `${clipToSplit.id}-split1-${Date.now()}`,
+        trimEnd: clipVideoTime,
+        // startTime stays the same
+      }
+      
+      const clip2: Clip = {
+        ...clipToSplit,
+        id: `${clipToSplit.id}-split2-${Date.now()}`,
+        trimStart: clipVideoTime,
+        startTime: splitTime, // Second clip starts at split point
+      }
+      
+      // Update tracks: remove original, add two new clips
+      const updatedTracks = state.tracks.map((track) => {
+        if (track.id === trackId) {
+          return {
+            ...track,
+            clips: [
+              ...track.clips.filter((c) => c.id !== clipId),
+              clip1,
+              clip2,
+            ],
+          }
+        }
+        return track
+      })
+      
+      return {
+        tracks: updatedTracks,
+        selectedClipId: clip2.id, // Select the second clip after split
+      }
+    }),
 
   addTrack: (track) =>
     set((state) => ({

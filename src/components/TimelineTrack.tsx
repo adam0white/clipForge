@@ -5,11 +5,12 @@ import './TimelineTrack.css'
 interface TimelineTrackProps {
   track: Track
   zoom: number
+  trackIndex: number
 }
 
-export function TimelineTrack({ track, zoom }: TimelineTrackProps) {
+export function TimelineTrack({ track, zoom, trackIndex }: TimelineTrackProps) {
   return (
-    <div className="timeline-track">
+    <div className="timeline-track" data-track-id={track.id}>
       <div className="track-content">
         {track.clips.map(clip => (
           <TimelineClip key={clip.id} clip={clip} zoom={zoom} />

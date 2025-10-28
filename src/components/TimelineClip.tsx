@@ -17,6 +17,7 @@ export function TimelineClip({ clip, zoom }: TimelineClipProps) {
   
   const [isDraggingLeft, setIsDraggingLeft] = useState(false)
   const [isDraggingRight, setIsDraggingRight] = useState(false)
+  const [isDraggingClip, setIsDraggingClip] = useState(false)
   const dragStartX = useRef(0)
   const initialTrim = useRef({ start: 0, end: 0, startTime: 0 })
   
@@ -27,12 +28,12 @@ export function TimelineClip({ clip, zoom }: TimelineClipProps) {
   
   // Sync optimistic state with actual clip state when not dragging
   useEffect(() => {
-    if (!isDraggingLeft && !isDraggingRight) {
+    if (!isDraggingLeft && !isDraggingRight && !isDraggingClip) {
       setOptimisticTrimStart(clip.trimStart)
       setOptimisticTrimEnd(clip.trimEnd)
       setOptimisticStartTime(clip.startTime)
     }
-  }, [clip.trimStart, clip.trimEnd, clip.startTime, isDraggingLeft, isDraggingRight])
+  }, [clip.trimStart, clip.trimEnd, clip.startTime, isDraggingLeft, isDraggingRight, isDraggingClip])
   
   // Calculate visual properties using optimistic state
   const clipDuration = optimisticTrimEnd - optimisticTrimStart
@@ -42,12 +43,32 @@ export function TimelineClip({ clip, zoom }: TimelineClipProps) {
   const isSelected = selectedClipId === clip.id
   
   const handleClick = (e: React.MouseEvent) => {
-    // Don't select if clicking on handles
-    if ((e.target as HTMLElement).classList.contains('clip-handle')) {
+    // Don't select if clicking on handles or delete button
+    const target = e.target as HTMLElement
+    if (target.classList.contains('clip-handle') || target.classList.contains('clip-delete-btn')) {
       return
     }
     setSelectedClip(clip.id)
   }
+  
+  // Handle clip body drag (to reorder/reposition)
+  const handleClipMouseDown = useCallback((e: React.MouseEvent) => {
+    // Don't start drag if clicking on handles, delete button, or other controls
+    const target = e.target as HTMLElement
+    if (
+      target.classList.contains('clip-handle') || 
+      target.classList.contains('clip-delete-btn') ||
+      target.tagName === 'BUTTON'
+    ) {
+      return
+    }
+    
+    e.stopPropagation()
+    setIsDraggingClip(true)
+    dragStartX.current = e.clientX
+    initialTrim.current = { start: clip.trimStart, end: clip.trimEnd, startTime: clip.startTime }
+    setSelectedClip(clip.id)
+  }, [clip.trimStart, clip.trimEnd, clip.startTime, clip.id, setSelectedClip])
   
   // Handle left trim (in point)
   const handleLeftMouseDown = useCallback((e: React.MouseEvent) => {
@@ -69,12 +90,21 @@ export function TimelineClip({ clip, zoom }: TimelineClipProps) {
   
   // Mouse move handler with optimistic UI
   const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!isDraggingLeft && !isDraggingRight) return
+    if (!isDraggingLeft && !isDraggingRight && !isDraggingClip) return
     
     const deltaX = e.clientX - dragStartX.current
     const deltaTime = deltaX / zoom
     
-    if (isDraggingLeft) {
+    if (isDraggingClip) {
+      // Move entire clip (change startTime, keep trim points)
+      const newStartTime = Math.max(0, initialTrim.current.startTime + deltaTime)
+      
+      // Optimistic update
+      setOptimisticStartTime(newStartTime)
+      
+      // Store update
+      updateClip(clip.id, { startTime: newStartTime })
+    } else if (isDraggingLeft) {
       // Trim from start - moves clip forward and adjusts in-point
       const newTrimStart = Math.max(
         0,
@@ -113,12 +143,13 @@ export function TimelineClip({ clip, zoom }: TimelineClipProps) {
       // Store update - actual state
       updateClip(clip.id, { trimEnd: newTrimEnd })
     }
-  }, [isDraggingLeft, isDraggingRight, zoom, clip.id, clip.duration, updateClip])
+  }, [isDraggingLeft, isDraggingRight, isDraggingClip, zoom, clip.id, clip.duration, updateClip])
   
   // Mouse up handler
   const handleMouseUp = useCallback(() => {
     setIsDraggingLeft(false)
     setIsDraggingRight(false)
+    setIsDraggingClip(false)
   }, [])
   
   // Delete handler
@@ -129,7 +160,7 @@ export function TimelineClip({ clip, zoom }: TimelineClipProps) {
   
   // Set up global mouse listeners when dragging
   useEffect(() => {
-    if (isDraggingLeft || isDraggingRight) {
+    if (isDraggingLeft || isDraggingRight || isDraggingClip) {
       window.addEventListener('mousemove', handleMouseMove)
       window.addEventListener('mouseup', handleMouseUp)
       
@@ -138,16 +169,18 @@ export function TimelineClip({ clip, zoom }: TimelineClipProps) {
         window.removeEventListener('mouseup', handleMouseUp)
       }
     }
-  }, [isDraggingLeft, isDraggingRight, handleMouseMove, handleMouseUp])
+  }, [isDraggingLeft, isDraggingRight, isDraggingClip, handleMouseMove, handleMouseUp])
   
   return (
     <div
-      className={`timeline-clip ${isSelected ? 'selected' : ''}`}
+      className={`timeline-clip ${isSelected ? 'selected' : ''} ${isDraggingClip ? 'dragging' : ''}`}
       style={{
         width: `${width}px`,
         left: `${left}px`,
+        cursor: isDraggingClip ? 'grabbing' : 'grab',
       }}
       onClick={handleClick}
+      onMouseDown={handleClipMouseDown}
     >
       {/* Thumbnail background */}
       {clip.thumbnail && (

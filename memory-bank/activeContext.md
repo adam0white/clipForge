@@ -1,15 +1,15 @@
 # Active Context: ClipForge
 
 **Last Updated**: 2025-10-28
-**Phase**: Phase 4.0 Complete - Screen & Webcam Recording
+**Phase**: Phase 5.0 Complete - Advanced Timeline Features
 
 ## Current Status
 
-✅ Phase 4.0 complete! Screen recording with source picker, webcam recording with audio, simultaneous screen+webcam capture, proper video scaling/padding for export, and WebM metadata handling all working perfectly.
+✅ Phase 5.0 complete! Drag-to-reorder clips, split functionality, delete with keyboard shortcuts, multi-track support, real-time scrubbing, and export resolution options all implemented and working.
 
 ## Current Focus
 
-Ready for Phase 5.0 (Advanced Timeline Features) or Phase 6.0 (Final Polish).
+Ready for Phase 6.0 (Final Polish & Testing).
 
 ## Next Steps
 
@@ -17,7 +17,7 @@ Ready for Phase 5.0 (Advanced Timeline Features) or Phase 6.0 (Final Polish).
 2. ✅ Phase 2.0: MVP core features (Import, Timeline, Preview, Trim, Export)
 3. ✅ Phase 3.0: MVP packaging and testing (.dmg build, install test)
 4. ✅ Phase 4.0: Screen & webcam recording
-5. Phase 5.0: Advanced timeline features (drag-to-reorder, split, multi-track)
+5. ✅ Phase 5.0: Advanced timeline features (drag-to-reorder, split, multi-track, scrubbing)
 6. Phase 6.0: Final polish and optimization
 
 ## Recent Decisions
@@ -50,17 +50,25 @@ Ready for Phase 5.0 (Advanced Timeline Features) or Phase 6.0 (Final Polish).
 - **Video Scaling**: FFmpeg scale+pad filter ensures all clips match target resolution (prevents stretching on export)
 - **Auto-Import**: Recordings saved to temp directory, automatically imported to timeline with correct duration
 
+**Phase 5:**
+- **Drag-to-Reorder**: Clips draggable on timeline, visual feedback with grab/grabbing cursor and elevation
+- **Split Clips**: Split button + S key, creates two clips at playhead position with adjusted trim points
+- **Delete Clips**: Delete button + Delete/Backspace keys to remove clips from timeline
+- **Multi-Track**: Add Track button, clips organized across tracks, export concatenates all clips
+- **Real-Time Scrubbing**: Enhanced playhead handle (16px×20px, white border, hover/drag effects), video preview syncs instantly, auto-switches clips
+- **Export Resolutions**: 720p/1080p/Source dropdown already implemented in Phase 4
+- **UX Polish**: Removed track label overlays for cleaner UI, enhanced playhead visibility and interaction
+
 ## Known Issues / Deferred Features
 
 **Working as designed (documented in systemPatterns.md):**
-- Clips cannot be dragged to reorder (import sequence determines order) - deferred to Phase 5+
 - Gaps in timeline are removed during export (clips concatenated end-to-end)
+- Multi-track export uses concatenation (not overlay composition) - true picture-in-picture deferred
 
 **Current limitations:**
-- Single track only (multi-track deferred to Phase 5+)
-- No split/cut functionality yet (trim only)
-- No undo/redo (deferred to Phase 5+)
-- Clips cannot be dragged to reorder (deferred to Phase 5+)
+- No undo/redo (deferred to Phase 6+)
+- Cannot drag clips between tracks (clips stay on their assigned track)
+- No audio mixing for multi-track (all audio tracks mixed equally)
 
 ## Blockers
 

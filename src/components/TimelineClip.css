@@ -20,6 +20,13 @@
   box-shadow: 0 0 0 2px var(--primary-color), 0 2px 12px rgba(99, 102, 241, 0.4);
 }
 
+.timeline-clip.dragging {
+  opacity: 0.8;
+  z-index: 100;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  transform: scale(1.02);
+}
+
 .clip-thumbnail {
   position: absolute;
   top: 0;

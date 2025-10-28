@@ -330,6 +330,60 @@ export const config = {
 
 ## Project-Specific Patterns
 
+### Advanced Timeline Features (Phase 5.0)
+
+**Drag-to-Reorder Clips**
+- Clips draggable anywhere on timeline via clip body (not handles)
+- Excludes handles, delete button, and other controls from drag initiation
+- Updates `startTime` property to reposition clip
+- Visual feedback: grab cursor → grabbing cursor, elevation with `.dragging` class
+- Optimistic UI: Local state updates immediately, store syncs in parallel
+- Export respects timeline order (sorted by `startTime`)
+
+**Split Functionality**
+- Split button in timeline header + S keyboard shortcut
+- Splits selected clip at current playhead position
+- Validation: Split point must be within clip bounds (trimStart < split < trimEnd)
+- Creates two new clips:
+  - Clip 1: Original trimStart → split point, original startTime
+  - Clip 2: Split point → original trimEnd, startTime = playhead position
+- Unique IDs with timestamp to prevent collisions
+- Auto-selects second clip after split for continued editing
+- Original clip removed, both new clips added atomically
+
+**Delete Functionality**
+- Delete button on selected clips + Delete/Backspace keyboard shortcuts
+- Removes clip from timeline, library remains intact
+- Deselects clip if it was selected
+- No confirmation dialog (quick workflow)
+
+**Multi-Track Support**
+- Store already supports multiple tracks (array-based)
+- Add Track button creates new track with auto-incrementing name
+- Clips assigned to trackId, stay on their track
+- Track UI simplified: No overlapping labels (removed to avoid hiding clips)
+- Export concatenates all clips in timeline order (all tracks merged)
+- True overlay composition (PIP) deferred for complexity
+
+**Real-Time Scrubbing**
+- Draggable playhead handle (enhanced UX):
+  - Larger size: 16px × 20px (was 12px × 12px)
+  - White border for contrast
+  - Positioned above timeline (-4px top) for easier access
+  - Hover effect: 15% scale up, color lightens
+  - Drag effect: 20% scale up, glow effect
+- Calculates new position from mouse X relative to timeline container
+- Updates video preview currentTime in real-time (< 100ms latency)
+- Auto-switches to different clip if playhead crosses clip boundaries
+- Pauses auto-sync during playback to avoid conflicts
+- Uses timeline container getBoundingClientRect() for accurate positioning
+
+**Keyboard Shortcuts**
+- S: Split clip at playhead
+- Delete/Backspace: Delete selected clip
+- Space: Play/Pause (inherited from Phase 2)
+- Input field detection: Shortcuts disabled when typing in inputs/textareas
+
 ### Recording Features (Phase 4.0)
 
 **Screen Recording with Electron desktopCapturer**

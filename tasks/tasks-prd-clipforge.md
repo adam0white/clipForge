@@ -34,12 +34,12 @@
 
 ### Components
 - `src/components/MediaLibrary.tsx` - ✅ File import and media library UI
-- `src/components/VideoPreview.tsx` - ✅ Video player component
-- `src/components/Timeline.tsx` - ✅ Timeline editor component
-- `src/components/TimelineClip.tsx` - ✅ Individual clip representation on timeline
-- `src/components/TimelineTrack.tsx` - ✅ Track container component
-- `src/components/ExportDialog.tsx` - ✅ Export settings and progress UI
-- `src/components/RecordingControls.tsx` - Screen/webcam recording UI
+- `src/components/VideoPreview.tsx` - ✅ Video player component with real-time scrubbing sync
+- `src/components/Timeline.tsx` - ✅ Timeline editor with playhead dragging, split/add track buttons
+- `src/components/TimelineClip.tsx` - ✅ Draggable clip with trim handles and delete button
+- `src/components/TimelineTrack.tsx` - ✅ Track container with labels
+- `src/components/ExportDialog.tsx` - ✅ Export settings with resolution options
+- `src/components/RecordingControls.tsx` - ✅ Screen/webcam recording UI
 
 ### Services
 - `electron/services/ffmpeg.ts` - ✅ FFmpeg integration for video export (main process)
@@ -134,33 +134,33 @@
     - [x] 4.2.4 Save both recordings and add to timeline as separate clips
     - [x] 4.2.5 Test combined screen + webcam recording workflow
 
-- [ ] **5.0 Advanced Editing Features (Drag, Split, Multi-track, Scrubbing)** 🟡 Day 2
-  - [ ] 5.1 **Drag to Reorder Clips**
-    - [ ] 5.1.1 Add drag-and-drop handlers to TimelineClip component
-    - [ ] 5.1.2 Update clip order in store on drop
-    - [ ] 5.1.3 Animate clip repositioning for smooth UX
-  - [ ] 5.2 **Split Clips**
-    - [ ] 5.2.1 Add "Split" button or keyboard shortcut (S key)
-    - [ ] 5.2.2 Split selected clip at playhead position
-    - [ ] 5.2.3 Create two new clips with adjusted in/out points in store
-    - [ ] 5.2.4 Update timeline view to show both clips
-  - [ ] 5.3 **Delete Clips**
-    - [ ] 5.3.1 Add delete button or keyboard shortcut (Delete/Backspace key)
-    - [ ] 5.3.2 Remove selected clip from store
-    - [ ] 5.3.3 Add confirmation for destructive actions (optional)
-  - [ ] 5.4 **Multi-Track Support**
-    - [ ] 5.4.1 Update timeline store to support multiple tracks (array of tracks)
-    - [ ] 5.4.2 Create TimelineTrack component container
-    - [ ] 5.4.3 Allow clips to be placed on different tracks
-    - [ ] 5.4.4 Update export to composite multiple tracks (FFmpeg overlay filter)
-  - [ ] 5.5 **Real-Time Scrubbing**
-    - [ ] 5.5.1 Make playhead draggable on timeline
-    - [ ] 5.5.2 Update video preview currentTime as playhead moves
-    - [ ] 5.5.3 Optimize for smooth scrubbing (debounce if needed, but < 100ms lag)
-  - [ ] 5.6 **Export Resolution Options**
-    - [ ] 5.6.1 Add resolution dropdown to ExportDialog (720p, 1080p presets)
-    - [ ] 5.6.2 Update FFmpeg command to apply selected resolution (scale filter)
-    - [ ] 5.6.3 Test exports at different resolutions
+- [x] **5.0 Advanced Editing Features (Drag, Split, Multi-track, Scrubbing)** 🟡 Day 2
+  - [x] 5.1 **Drag to Reorder Clips**
+    - [x] 5.1.1 Add drag-and-drop handlers to TimelineClip component
+    - [x] 5.1.2 Update clip order in store on drop
+    - [x] 5.1.3 Animate clip repositioning for smooth UX
+  - [x] 5.2 **Split Clips**
+    - [x] 5.2.1 Add "Split" button or keyboard shortcut (S key)
+    - [x] 5.2.2 Split selected clip at playhead position
+    - [x] 5.2.3 Create two new clips with adjusted in/out points in store
+    - [x] 5.2.4 Update timeline view to show both clips
+  - [x] 5.3 **Delete Clips**
+    - [x] 5.3.1 Add delete button or keyboard shortcut (Delete/Backspace key)
+    - [x] 5.3.2 Remove selected clip from store
+    - [x] 5.3.3 Add confirmation for destructive actions (optional)
+  - [x] 5.4 **Multi-Track Support**
+    - [x] 5.4.1 Update timeline store to support multiple tracks (array of tracks)
+    - [x] 5.4.2 Create TimelineTrack component container
+    - [x] 5.4.3 Allow clips to be placed on different tracks
+    - [x] 5.4.4 Update export to composite multiple tracks (FFmpeg overlay filter)
+  - [x] 5.5 **Real-Time Scrubbing**
+    - [x] 5.5.1 Make playhead draggable on timeline
+    - [x] 5.5.2 Update video preview currentTime as playhead moves
+    - [x] 5.5.3 Optimize for smooth scrubbing (debounce if needed, but < 100ms lag)
+  - [x] 5.6 **Export Resolution Options**
+    - [x] 5.6.1 Add resolution dropdown to ExportDialog (720p, 1080p presets)
+    - [x] 5.6.2 Update FFmpeg command to apply selected resolution (scale filter)
+    - [x] 5.6.3 Test exports at different resolutions
 
 - [ ] **6.0 Final Packaging, Testing & Distribution** 🟢 Day 3
   - [ ] 6.1 Run full regression testing on all features

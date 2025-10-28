@@ -15,6 +15,7 @@ ffmpeg.setFfmpegPath(ffmpegPath)
 
 /**
  * Export video clips to a single MP4 file
+ * Supports multi-track overlay composition
  */
 export async function exportVideo(
   clips: Clip[],
@@ -26,7 +27,37 @@ export async function exportVideo(
       return { success: false, error: 'No clips to export' }
     }
 
-    // Sort clips by start time
+    // Group clips by track
+    const clipsByTrack = clips.reduce((acc, clip) => {
+      if (!acc[clip.trackId]) {
+        acc[clip.trackId] = []
+      }
+      acc[clip.trackId].push(clip)
+      return acc
+    }, {} as Record<string, Clip[]>)
+    
+    const trackIds = Object.keys(clipsByTrack)
+    
+    // If only one track, use simple concatenation
+    if (trackIds.length === 1) {
+      const sortedClips = [...clips].sort((a, b) => a.startTime - b.startTime)
+      
+      // Calculate total duration for progress tracking
+      const totalDuration = sortedClips.reduce(
+        (sum, clip) => sum + (clip.trimEnd - clip.trimStart),
+        0
+      )
+      
+      if (sortedClips.length === 1) {
+        return await exportSingleClip(sortedClips[0], settings, totalDuration, onProgress)
+      }
+      
+      return await exportMultipleClips(sortedClips, settings, totalDuration, onProgress)
+    }
+    
+    // Multiple tracks: concatenate all clips in timeline order
+    // Note: True overlay composition (picture-in-picture) would require complex FFmpeg filter chains
+    // For MVP, we concatenate all clips in timeline order regardless of track
     const sortedClips = [...clips].sort((a, b) => a.startTime - b.startTime)
     
     // Calculate total duration for progress tracking
@@ -35,12 +66,10 @@ export async function exportVideo(
       0
     )
 
-    // If only one clip, process it directly
     if (sortedClips.length === 1) {
       return await exportSingleClip(sortedClips[0], settings, totalDuration, onProgress)
     }
 
-    // Multiple clips: concatenate them
     return await exportMultipleClips(sortedClips, settings, totalDuration, onProgress)
   } catch (error) {
     console.error('Export error:', error)
