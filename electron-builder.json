@@ -3,13 +3,17 @@
   "appId": "com.clipforge.app",
   "productName": "ClipForge",
   "asar": true,
+  "asarUnpack": [
+    "node_modules/@ffmpeg-installer"
+  ],
   "directories": {
     "output": "release/${version}",
     "buildResources": "build"
   },
   "files": [
     "dist-electron",
-    "dist"
+    "dist",
+    "node_modules/@ffmpeg-installer/**/*"
   ],
   "mac": {
     "icon": "build/icon.icns",

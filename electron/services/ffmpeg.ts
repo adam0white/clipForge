@@ -5,8 +5,14 @@ import path from 'node:path'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 
-// Set FFmpeg path
-ffmpeg.setFfmpegPath(ffmpegInstaller.path)
+// Set FFmpeg path - handle ASAR packaging
+// In packaged app, binaries are in .asar.unpacked, not .asar
+let ffmpegPath = ffmpegInstaller.path
+if (ffmpegPath.includes('app.asar')) {
+  ffmpegPath = ffmpegPath.replace('app.asar', 'app.asar.unpacked')
+}
+console.log('FFmpeg path:', ffmpegPath)
+ffmpeg.setFfmpegPath(ffmpegPath)
 
 /**
  * Export video clips to a single MP4 file

@@ -66,7 +66,11 @@ async function createWindow() {
     height: 900,
     minWidth: 1200,
     minHeight: 700,
-    icon: path.join(process.env.VITE_PUBLIC, 'favicon.ico'),
+    // On macOS, icon is automatically set from .icns in app bundle
+    // On Windows/Linux, set icon from public folder
+    ...(process.platform !== 'darwin' && {
+      icon: path.join(process.env.VITE_PUBLIC || '', 'favicon.ico'),
+    }),
     webPreferences: {
       preload,
       // Security: contextIsolation enabled by default

@@ -4,11 +4,13 @@ Desktop video editor built with Electron, React, and TypeScript.
 
 ## Features
 
-- 🎬 Import and organize video clips
-- ✂️ Timeline-based video editing
-- 🎥 Real-time video preview
+- 🎬 Import and organize video clips (drag & drop, file picker)
+- ✂️ Timeline-based editing with trim functionality
+- 🎥 Real-time video preview with playback controls
+- 📤 Export to MP4 with progress tracking
 - ⚡ FFmpeg-powered video processing
-- 📦 Native desktop app for macOS
+- 💾 Save/load projects (.cfproj format)
+- 📦 Native desktop app for macOS (.dmg)
 
 ## Tech Stack
 
@@ -54,7 +56,10 @@ clipForge/
 
 ## Status
 
-🟢 **Phase 1 Complete** - Development environment ready
+✅ **MVP Complete** - Fully functional video editor packaged and tested
+- Phase 1.0: Project setup ✅
+- Phase 2.0: Core features (import, timeline, preview, trim, export) ✅
+- Phase 3.0: Packaging & testing (.dmg for macOS) ✅
 
 See `tasks/tasks-prd-clipforge.md` for detailed roadmap.
 

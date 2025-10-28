@@ -109,15 +109,15 @@
     - [x] 2.6.4 Add Save/Load Project buttons to App UI
   - [x] 2.7 **Project Icon**
 
-- [ ] **3.0 MVP Packaging & Initial Testing** 🔴 Day 1
-  - [ ] 3.1 Run production build (`npm run build`)
-  - [ ] 3.2 Package app using electron-builder (`npm run package`)
-  - [ ] 3.3 Test packaged .dmg/.app on Mac (not just dev mode)
-  - [ ] 3.4 Verify complete workflow in packaged app: import → timeline → trim → export
-  - [ ] 3.5 Test with multiple video files (3+ clips)
-  - [ ] 3.6 Validate exported videos play correctly in multiple players
-  - [ ] 3.7 Fix any packaging issues discovered (missing FFmpeg binary, path issues, etc.)
-  - [ ] 3.8 Document any known issues or limitations
+- [x] **3.0 MVP Packaging & Initial Testing** 🔴 Day 1
+  - [x] 3.1 Run production build (`npm run build`)
+  - [x] 3.2 Package app using electron-builder (`npm run package`)
+  - [x] 3.3 Test packaged .dmg/.app on Mac (not just dev mode)
+  - [x] 3.4 Verify complete workflow in packaged app: import → timeline → trim → export
+  - [x] 3.5 Test with multiple video files (3+ clips)
+  - [x] 3.6 Validate exported videos play correctly in multiple players
+  - [x] 3.7 Fix any packaging issues discovered (FFmpeg ASAR unpacking, icon regenerated with iconutil)
+  - [x] 3.8 Document any known issues or limitations
 
 - [ ] **4.0 Recording Features (Screen & Webcam)** 🟡 Day 2
   - [ ] 4.1 **Screen Recording**
