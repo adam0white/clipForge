@@ -17,8 +17,13 @@
     "build": "tsc && vite build",
     "package": "npm run build && electron-builder",
     "preview": "vite preview",
-    "pretest": "vite build --mode=test",
-    "test": "vitest run"
+    "test": "npm run test:unit",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:setup": "tsx test/setup.ts",
+    "test:all": "npm run test:setup && npm run test:unit && npm run test:e2e"
   },
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
@@ -30,6 +35,7 @@
   "devDependencies": {
     "@playwright/test": "^1.48.2",
     "@types/fluent-ffmpeg": "^2.1.28",
+    "@types/node": "^24.9.2",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
     "@vitejs/plugin-react": "^5.1.0",
@@ -37,12 +43,14 @@
     "electron": "^38.4.0",
     "electron-builder": "^26.0.12",
     "electron-icon-maker": "^0.0.5",
+    "jsdom": "^27.0.1",
     "postcss": "^8.4.49",
     "postcss-import": "^16.1.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "sharp": "^0.34.4",
     "tailwindcss": "^4.1.16",
+    "tsx": "^4.20.6",
     "typescript": "^5.4.2",
     "vite": "^7.1.12",
     "vite-plugin-electron": "^0.29.0",

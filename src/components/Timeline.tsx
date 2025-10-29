@@ -63,6 +63,9 @@ export function Timeline() {
     e.preventDefault()
     e.stopPropagation()
     setIsDraggingPlayhead(true)
+    
+    // Pause playback when dragging playhead
+    window.dispatchEvent(new CustomEvent('pause-playback'))
   }, [])
   
   const handlePlayheadMouseMove = useCallback((e: MouseEvent) => {

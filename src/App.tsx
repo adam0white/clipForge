@@ -41,7 +41,9 @@ function App() {
       for (const { filePath, duration: providedDuration } of files) {
         // 2.1.3: Validate imported files
         if (!isVideoFile(filePath)) {
+          const fileName = getFileName(filePath)
           console.warn('Skipping unsupported file:', filePath)
+          alert(`Unsupported file format: ${fileName}\n\nSupported formats: MP4, MOV, AVI, MKV, WebM`)
           continue
         }
 
@@ -60,7 +62,9 @@ function App() {
               metadata = { width: 1920, height: 1080, codec: 'vp9', frameRate: 30 }
               thumbnail = null
             } else {
+              const fileName = getFileName(filePath)
               console.error('Failed to extract metadata for:', filePath)
+              alert(`Failed to load video: ${fileName}\n\nThe video file may be corrupted or in an unsupported codec.`)
               continue
             }
           } else {
@@ -102,7 +106,9 @@ function App() {
           // Increment position for next clip in batch
           currentPosition += duration
         } catch (error) {
+          const fileName = getFileName(filePath)
           console.error('Failed to process file:', filePath, error)
+          alert(`Error processing file: ${fileName}\n\n${error instanceof Error ? error.message : 'Unknown error'}`)
         }
       }
     } finally {

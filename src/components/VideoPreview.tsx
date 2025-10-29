@@ -30,15 +30,30 @@ export function VideoPreview() {
     
     const video = videoRef.current
     
-    // Add error handler to prevent infinite loop
+    // Add error handler for missing or corrupt files
     const handleError = (e: Event) => {
-      // WebM files from recordings may not load immediately - this is often normal
-      const isWebM = selectedClip.filePath.toLowerCase().endsWith('.webm')
-      if (!isWebM) {
-        console.error('Video preview failed to load:', selectedClip.filePath)
+      const target = e.target as HTMLVideoElement
+      const error = target.error
+      
+      // Show user-friendly error message
+      const fileName = selectedClip.filePath.split('/').pop() || selectedClip.name
+      const isTemp = selectedClip.filePath.includes('/clipforge-recordings/')
+      
+      if (error) {
+        let errorMessage = 'Video file could not be loaded.'
+        
+        if (isTemp) {
+          errorMessage = `Temporary recording file is missing: ${fileName}\n\nThis file may have been deleted. Please re-record or import a new video.`
+        } else {
+          errorMessage = `Could not load: ${fileName}\n\nThe file may be missing, moved, or corrupted.`
+        }
+        
+        console.error('Video preview failed to load:', selectedClip.filePath, error)
+        alert(errorMessage)
       }
-      // Don't retry - just stop
-      video.removeEventListener('error', handleError)
+      
+      // Stop playback on error
+      setIsPlaying(false)
     }
     
     video.addEventListener('error', handleError, { once: true })
@@ -101,10 +116,26 @@ export function VideoPreview() {
       const nextClip = allClips[currentIndex + 1]
       
       if (nextClip && isPlaying) {
-        // Load and play next clip
+        // Check if there's a gap between clips
+        const currentClipEnd = selectedClip.startTime + (selectedClip.trimEnd - selectedClip.trimStart)
+        const hasGap = nextClip.startTime > currentClipEnd + 0.1 // Allow 0.1s tolerance
+        
+        if (hasGap) {
+          // There's a gap - stop playback instead of jumping
+          video.pause()
+          setIsPlaying(false)
+          return
+        }
+        
+        // Load and play next clip (wait for it to be ready)
+        const onLoadedMetadata = () => {
+          video.currentTime = nextClip.trimStart
+          video.play().catch(() => setIsPlaying(false))
+          video.removeEventListener('loadedmetadata', onLoadedMetadata)
+        }
+        
+        video.addEventListener('loadedmetadata', onLoadedMetadata, { once: true })
         video.src = `safe-file:///${nextClip.filePath}`
-        video.currentTime = nextClip.trimStart
-        video.play().catch(() => setIsPlaying(false))
         useTimelineStore.getState().setSelectedClip(nextClip.id)
       } else {
         // No more clips - stop playback
@@ -133,42 +164,96 @@ export function VideoPreview() {
     
     const video = videoRef.current
     if (video.paused) {
+      // Before playing, ensure we're on a valid clip
+      // If playhead is before all clips, jump to first clip
+      if (allClips.length > 0) {
+        const firstClip = allClips[0]
+        if (playheadPosition < firstClip.startTime) {
+          setPlayheadPosition(firstClip.startTime)
+          video.src = `safe-file:///${firstClip.filePath}`
+          video.currentTime = firstClip.trimStart
+          useTimelineStore.getState().setSelectedClip(firstClip.id)
+        }
+      }
+      
       video.play()
       setIsPlaying(true)
     } else {
       video.pause()
       setIsPlaying(false)
     }
-  }, [])
+  }, [allClips, playheadPosition, setPlayheadPosition])
   
-  // Stop (pause and reset to start)
+  // Stop (pause and reset to start of timeline)
   const handleStop = useCallback(() => {
-    if (!videoRef.current || !selectedClip) return
+    if (!videoRef.current) return
     
     const video = videoRef.current
     video.pause()
-    video.currentTime = selectedClip.trimStart
     setIsPlaying(false)
-    setCurrentTime(selectedClip.trimStart)
-  }, [selectedClip])
+    
+    // Move playhead to start of timeline
+    setPlayheadPosition(0)
+    
+    // If there's a first clip, load it and seek to its start
+    if (allClips.length > 0) {
+      const firstClip = allClips[0]
+      video.src = `safe-file:///${firstClip.filePath}`
+      video.currentTime = firstClip.trimStart
+      setCurrentTime(firstClip.trimStart)
+      useTimelineStore.getState().setSelectedClip(firstClip.id)
+    }
+  }, [allClips, setPlayheadPosition])
   
-  // Jump to start of clip
+  // Jump to start of timeline
   const handleJumpToStart = useCallback(() => {
-    if (!videoRef.current || !selectedClip) return
+    if (!videoRef.current) return
     
-    const video = videoRef.current
-    video.currentTime = selectedClip.trimStart
-    setCurrentTime(selectedClip.trimStart)
-  }, [selectedClip])
+    // Move playhead to start of timeline
+    setPlayheadPosition(0)
+    
+    // Load first clip if available
+    if (allClips.length > 0) {
+      const firstClip = allClips[0]
+      const video = videoRef.current
+      video.src = `safe-file:///${firstClip.filePath}`
+      video.currentTime = firstClip.trimStart
+      setCurrentTime(firstClip.trimStart)
+      useTimelineStore.getState().setSelectedClip(firstClip.id)
+    }
+  }, [allClips, setPlayheadPosition])
   
-  // Jump to end of clip
+  // Jump to end of timeline
   const handleJumpToEnd = useCallback(() => {
-    if (!videoRef.current || !selectedClip) return
+    if (!videoRef.current || allClips.length === 0) return
     
+    // Find the last clip
+    const lastClip = allClips[allClips.length - 1]
+    const timelineEnd = lastClip.startTime + (lastClip.trimEnd - lastClip.trimStart)
+    
+    // Move playhead to end of timeline
+    setPlayheadPosition(timelineEnd - 0.1)
+    
+    // Load and seek to last clip
     const video = videoRef.current
-    video.currentTime = selectedClip.trimEnd - 0.1 // Slightly before end
-    setCurrentTime(selectedClip.trimEnd - 0.1)
-  }, [selectedClip])
+    video.src = `safe-file:///${lastClip.filePath}`
+    video.currentTime = lastClip.trimEnd - 0.1
+    setCurrentTime(lastClip.trimEnd - 0.1)
+    useTimelineStore.getState().setSelectedClip(lastClip.id)
+  }, [allClips, setPlayheadPosition])
+  
+  // Listen for pause requests from playhead dragging
+  useEffect(() => {
+    const handlePauseRequest = () => {
+      if (videoRef.current && !videoRef.current.paused) {
+        videoRef.current.pause()
+        setIsPlaying(false)
+      }
+    }
+    
+    window.addEventListener('pause-playback', handlePauseRequest)
+    return () => window.removeEventListener('pause-playback', handlePauseRequest)
+  }, [])
   
   // Keyboard shortcuts
   useEffect(() => {
@@ -198,7 +283,6 @@ export function VideoPreview() {
             ref={videoRef}
             className="preview-video"
             onTimeUpdate={handleTimeUpdate}
-            onEnded={() => setIsPlaying(false)}
           >
             Your browser does not support video playback.
           </video>

@@ -133,6 +133,7 @@ export function RecordingControls({ onRecordingComplete }: RecordingControlsProp
   const handleStartRecording = useCallback(async () => {
     if (!selectedSource) {
       console.error('No source selected')
+      alert('Please select a screen or window to record.')
       return
     }
 

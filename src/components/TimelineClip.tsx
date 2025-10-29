@@ -14,6 +14,7 @@ export function TimelineClip({ clip, zoom }: TimelineClipProps) {
   const setSelectedClip = useTimelineStore((state) => state.setSelectedClip)
   const updateClip = useTimelineStore((state) => state.updateClip)
   const removeClip = useTimelineStore((state) => state.removeClip)
+  const tracks = useTimelineStore((state) => state.tracks)
   
   const [isDraggingLeft, setIsDraggingLeft] = useState(false)
   const [isDraggingRight, setIsDraggingRight] = useState(false)
@@ -88,6 +89,40 @@ export function TimelineClip({ clip, zoom }: TimelineClipProps) {
     setSelectedClip(clip.id)
   }, [clip.trimStart, clip.trimEnd, clip.startTime, clip.id, setSelectedClip])
   
+  // Helper function to check for collisions with other clips
+  const checkCollision = useCallback((proposedStartTime: number, proposedDuration: number): number => {
+    // Get all clips on the same track except this one
+    const track = tracks.find(t => t.id === clip.trackId)
+    if (!track) return proposedStartTime
+    
+    const otherClips = track.clips.filter(c => c.id !== clip.id)
+    const proposedEnd = proposedStartTime + proposedDuration
+    
+    // Check for collisions and snap to nearest valid position
+    for (const other of otherClips) {
+      const otherEnd = other.startTime + (other.trimEnd - other.trimStart)
+      
+      // Check if proposed position overlaps with this clip
+      const overlapsStart = proposedStartTime < otherEnd && proposedEnd > other.startTime
+      
+      if (overlapsStart) {
+        // Determine which side to snap to (left or right of the other clip)
+        const distanceToLeft = Math.abs(proposedStartTime - otherEnd)
+        const distanceToRight = Math.abs(proposedStartTime - (other.startTime - proposedDuration))
+        
+        if (distanceToLeft < distanceToRight && otherEnd >= 0) {
+          // Snap to right side of the other clip
+          return otherEnd
+        } else if (other.startTime - proposedDuration >= 0) {
+          // Snap to left side of the other clip
+          return other.startTime - proposedDuration
+        }
+      }
+    }
+    
+    return proposedStartTime
+  }, [clip.id, clip.trackId, tracks])
+
   // Mouse move handler with optimistic UI
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!isDraggingLeft && !isDraggingRight && !isDraggingClip) return
@@ -97,7 +132,11 @@ export function TimelineClip({ clip, zoom }: TimelineClipProps) {
     
     if (isDraggingClip) {
       // Move entire clip (change startTime, keep trim points)
-      const newStartTime = Math.max(0, initialTrim.current.startTime + deltaTime)
+      const proposedStartTime = Math.max(0, initialTrim.current.startTime + deltaTime)
+      const clipDuration = clip.trimEnd - clip.trimStart
+      
+      // Check for collisions and adjust if needed
+      const newStartTime = checkCollision(proposedStartTime, clipDuration)
       
       // Optimistic update
       setOptimisticStartTime(newStartTime)
@@ -143,7 +182,7 @@ export function TimelineClip({ clip, zoom }: TimelineClipProps) {
       // Store update - actual state
       updateClip(clip.id, { trimEnd: newTrimEnd })
     }
-  }, [isDraggingLeft, isDraggingRight, isDraggingClip, zoom, clip.id, clip.duration, updateClip])
+  }, [isDraggingLeft, isDraggingRight, isDraggingClip, zoom, clip.id, clip.duration, clip.trimStart, clip.trimEnd, updateClip, checkCollision])
   
   // Mouse up handler
   const handleMouseUp = useCallback(() => {
