@@ -8,6 +8,9 @@ export function VideoPreview() {
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
+  const currentLoadedPath = useRef<string>('') // Track currently loaded file
+  const isLoadingRef = useRef(false) // Prevent concurrent loads
+  const isScrubbingRef = useRef(false) // Track if user is scrubbing playhead
   
   const tracks = useTimelineStore((state) => state.tracks)
   const selectedClipId = useTimelineStore((state) => state.selectedClipId)
@@ -24,6 +27,39 @@ export function VideoPreview() {
     ? allClips.find(clip => clip.id === selectedClipId)
     : allClips[0]
   
+  // Helper function to safely load a video source
+  const loadVideoSource = useCallback((filePath: string, seekTime: number) => {
+    if (!videoRef.current) return
+    
+    const video = videoRef.current
+    const targetSrc = `safe-file:///${filePath}`
+    
+    // Only load if it's a different file and not already loading
+    if (currentLoadedPath.current === filePath) {
+      // Same file - just seek
+      video.currentTime = seekTime
+      return
+    }
+    
+    // Prevent concurrent loads
+    if (isLoadingRef.current) {
+      return
+    }
+    
+    isLoadingRef.current = true
+    currentLoadedPath.current = filePath
+    
+    // Set up one-time load handler
+    const onLoadedMetadata = () => {
+      video.currentTime = seekTime
+      isLoadingRef.current = false
+      video.removeEventListener('loadedmetadata', onLoadedMetadata)
+    }
+    
+    video.addEventListener('loadedmetadata', onLoadedMetadata, { once: true })
+    video.src = targetSrc
+  }, [])
+  
   // Load selected clip into video element
   useEffect(() => {
     if (!selectedClip || !videoRef.current) return
@@ -35,45 +71,65 @@ export function VideoPreview() {
       const target = e.target as HTMLVideoElement
       const error = target.error
       
-      // Show user-friendly error message
-      const fileName = selectedClip.filePath.split('/').pop() || selectedClip.name
-      const isTemp = selectedClip.filePath.includes('/clipforge-recordings/')
-      
       if (error) {
-        let errorMessage = 'Video file could not be loaded.'
+        // Log error but don't show alert (could be transient during rapid seeking)
+        console.error('Video preview error:', selectedClip.filePath, error.message || error.code)
         
-        if (isTemp) {
-          errorMessage = `Temporary recording file is missing: ${fileName}\n\nThis file may have been deleted. Please re-record or import a new video.`
-        } else {
-          errorMessage = `Could not load: ${fileName}\n\nThe file may be missing, moved, or corrupted.`
+        // Only show alert for critical errors (file not found)
+        if (error.code === 4 || error.code === 2) {
+          const fileName = selectedClip.filePath.split('/').pop() || selectedClip.name
+          const isTemp = selectedClip.filePath.includes('/clipforge-recordings/')
+          
+          const errorMessage = isTemp
+            ? `Temporary recording file is missing: ${fileName}\n\nThis file may have been deleted.`
+            : `Could not load: ${fileName}\n\nThe file may be missing, moved, or corrupted.`
+          
+          alert(errorMessage)
         }
-        
-        console.error('Video preview failed to load:', selectedClip.filePath, error)
-        alert(errorMessage)
       }
       
-      // Stop playback on error
+      // Stop playback and reset loading state on error
       setIsPlaying(false)
+      isLoadingRef.current = false
     }
     
-    video.addEventListener('error', handleError, { once: true })
+    video.addEventListener('error', handleError)
     
-    // IMPORTANT: Use 3 slashes (safe-file:///) for proper URL parsing
-    video.src = `safe-file:///${selectedClip.filePath}`
-    video.currentTime = selectedClip.trimStart
+    // Load the video source safely
+    loadVideoSource(selectedClip.filePath, selectedClip.trimStart)
     setCurrentTime(selectedClip.trimStart)
     setDuration(selectedClip.trimEnd - selectedClip.trimStart)
     
     return () => {
       video.removeEventListener('error', handleError)
     }
-  }, [selectedClip])
+  }, [selectedClip, loadVideoSource])
   
   // Sync video with playhead position (for scrubbing)
   useEffect(() => {
     if (!videoRef.current || !selectedClip || isPlaying) return
     
-    // Find which clip the playhead is currently on
+    // During scrubbing, only seek within the selected clip - don't auto-switch clips
+    if (isScrubbingRef.current) {
+      // Check if playhead is within the selected clip's bounds
+      const clipEnd = selectedClip.startTime + (selectedClip.trimEnd - selectedClip.trimStart)
+      
+      if (playheadPosition >= selectedClip.startTime && playheadPosition < clipEnd) {
+        // Playhead is within selected clip - seek to position
+        const clipRelativeTime = playheadPosition - selectedClip.startTime
+        const videoTime = selectedClip.trimStart + clipRelativeTime
+        
+        if (Math.abs(videoRef.current.currentTime - videoTime) > 0.1) {
+          videoRef.current.currentTime = videoTime
+          setCurrentTime(videoTime)
+        }
+      }
+      // If playhead is outside selected clip during scrubbing, don't do anything
+      // This prevents automatic clip switching during scrubbing
+      return
+    }
+    
+    // Not scrubbing - allow automatic clip switching for playback
     const currentClip = allClips.find(
       clip => playheadPosition >= clip.startTime && 
               playheadPosition < clip.startTime + (clip.trimEnd - clip.trimStart)
@@ -88,18 +144,8 @@ export function VideoPreview() {
         videoRef.current.currentTime = videoTime
         setCurrentTime(videoTime)
       }
-    } else if (currentClip && currentClip.id !== selectedClip.id) {
-      // Playhead moved to a different clip - switch to it
-      const video = videoRef.current
-      video.src = `safe-file:///${currentClip.filePath}`
-      
-      const clipRelativeTime = playheadPosition - currentClip.startTime
-      const videoTime = currentClip.trimStart + clipRelativeTime
-      video.currentTime = videoTime
-      setCurrentTime(videoTime)
-      
-      useTimelineStore.getState().setSelectedClip(currentClip.id)
     }
+    // Removed automatic clip switching when not scrubbing to prevent infinite loop
   }, [playheadPosition, selectedClip, allClips, isPlaying])
   
   // Update current time
@@ -127,15 +173,16 @@ export function VideoPreview() {
           return
         }
         
-        // Load and play next clip (wait for it to be ready)
-        const onLoadedMetadata = () => {
-          video.currentTime = nextClip.trimStart
-          video.play().catch(() => setIsPlaying(false))
-          video.removeEventListener('loadedmetadata', onLoadedMetadata)
-        }
+        // Load and play next clip
+        loadVideoSource(nextClip.filePath, nextClip.trimStart)
         
-        video.addEventListener('loadedmetadata', onLoadedMetadata, { once: true })
-        video.src = `safe-file:///${nextClip.filePath}`
+        // Wait a tiny bit for the load to start, then play
+        setTimeout(() => {
+          if (videoRef.current) {
+            videoRef.current.play().catch(() => setIsPlaying(false))
+          }
+        }, 50)
+        
         useTimelineStore.getState().setSelectedClip(nextClip.id)
       } else {
         // No more clips - stop playback
@@ -153,10 +200,12 @@ export function VideoPreview() {
     
     setCurrentTime(currentVideoTime)
     
-    // Sync with timeline playhead
-    const timelinePosition = selectedClip.startTime + (currentVideoTime - selectedClip.trimStart)
-    setPlayheadPosition(timelinePosition)
-  }, [selectedClip, allClips, isPlaying, setPlayheadPosition])
+    // Sync with timeline playhead (but not during scrubbing to avoid feedback loop)
+    if (!isScrubbingRef.current) {
+      const timelinePosition = selectedClip.startTime + (currentVideoTime - selectedClip.trimStart)
+      setPlayheadPosition(timelinePosition)
+    }
+  }, [selectedClip, allClips, isPlaying, setPlayheadPosition, loadVideoSource])
   
   // Play/Pause toggle
   const handlePlayPause = useCallback(() => {
@@ -170,8 +219,7 @@ export function VideoPreview() {
         const firstClip = allClips[0]
         if (playheadPosition < firstClip.startTime) {
           setPlayheadPosition(firstClip.startTime)
-          video.src = `safe-file:///${firstClip.filePath}`
-          video.currentTime = firstClip.trimStart
+          loadVideoSource(firstClip.filePath, firstClip.trimStart)
           useTimelineStore.getState().setSelectedClip(firstClip.id)
         }
       }
@@ -182,7 +230,7 @@ export function VideoPreview() {
       video.pause()
       setIsPlaying(false)
     }
-  }, [allClips, playheadPosition, setPlayheadPosition])
+  }, [allClips, playheadPosition, setPlayheadPosition, loadVideoSource])
   
   // Stop (pause and reset to start of timeline)
   const handleStop = useCallback(() => {
@@ -198,12 +246,11 @@ export function VideoPreview() {
     // If there's a first clip, load it and seek to its start
     if (allClips.length > 0) {
       const firstClip = allClips[0]
-      video.src = `safe-file:///${firstClip.filePath}`
-      video.currentTime = firstClip.trimStart
+      loadVideoSource(firstClip.filePath, firstClip.trimStart)
       setCurrentTime(firstClip.trimStart)
       useTimelineStore.getState().setSelectedClip(firstClip.id)
     }
-  }, [allClips, setPlayheadPosition])
+  }, [allClips, setPlayheadPosition, loadVideoSource])
   
   // Jump to start of timeline
   const handleJumpToStart = useCallback(() => {
@@ -215,13 +262,11 @@ export function VideoPreview() {
     // Load first clip if available
     if (allClips.length > 0) {
       const firstClip = allClips[0]
-      const video = videoRef.current
-      video.src = `safe-file:///${firstClip.filePath}`
-      video.currentTime = firstClip.trimStart
+      loadVideoSource(firstClip.filePath, firstClip.trimStart)
       setCurrentTime(firstClip.trimStart)
       useTimelineStore.getState().setSelectedClip(firstClip.id)
     }
-  }, [allClips, setPlayheadPosition])
+  }, [allClips, setPlayheadPosition, loadVideoSource])
   
   // Jump to end of timeline
   const handleJumpToEnd = useCallback(() => {
@@ -235,24 +280,33 @@ export function VideoPreview() {
     setPlayheadPosition(timelineEnd - 0.1)
     
     // Load and seek to last clip
-    const video = videoRef.current
-    video.src = `safe-file:///${lastClip.filePath}`
-    video.currentTime = lastClip.trimEnd - 0.1
+    loadVideoSource(lastClip.filePath, lastClip.trimEnd - 0.1)
     setCurrentTime(lastClip.trimEnd - 0.1)
     useTimelineStore.getState().setSelectedClip(lastClip.id)
-  }, [allClips, setPlayheadPosition])
+  }, [allClips, setPlayheadPosition, loadVideoSource])
   
-  // Listen for pause requests from playhead dragging
+  // Listen for scrubbing events (playhead dragging)
   useEffect(() => {
-    const handlePauseRequest = () => {
+    const handleStartScrubbing = () => {
+      isScrubbingRef.current = true
+      // Pause playback when scrubbing starts
       if (videoRef.current && !videoRef.current.paused) {
         videoRef.current.pause()
         setIsPlaying(false)
       }
     }
     
-    window.addEventListener('pause-playback', handlePauseRequest)
-    return () => window.removeEventListener('pause-playback', handlePauseRequest)
+    const handleEndScrubbing = () => {
+      isScrubbingRef.current = false
+    }
+    
+    window.addEventListener('pause-playback', handleStartScrubbing)
+    window.addEventListener('scrubbing-end', handleEndScrubbing)
+    
+    return () => {
+      window.removeEventListener('pause-playback', handleStartScrubbing)
+      window.removeEventListener('scrubbing-end', handleEndScrubbing)
+    }
   }, [])
   
   // Keyboard shortcuts

@@ -81,6 +81,9 @@ export function Timeline() {
   
   const handlePlayheadMouseUp = useCallback(() => {
     setIsDraggingPlayhead(false)
+    
+    // Signal that scrubbing has ended
+    window.dispatchEvent(new CustomEvent('scrubbing-end'))
   }, [])
   
   // Playhead drag listeners
