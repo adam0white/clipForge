@@ -3,6 +3,11 @@ import { useTimelineStore } from '@/store/timelineStore'
 import { formatTime } from '@/utils/videoUtils'
 import './VideoPreview.css'
 
+const SEEK_TOLERANCE = 0.03
+const MAX_SEEK_ATTEMPTS = 4
+const SEEK_TIMEOUT_MS = 1200
+const SEEK_RETRY_DELAY_MS = 30
+
 export function VideoPreview() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [isPlaying, setIsPlaying] = useState(false)
@@ -11,6 +16,138 @@ export function VideoPreview() {
   const currentLoadedPath = useRef<string>('') // Track currently loaded file
   const isLoadingRef = useRef(false) // Prevent concurrent loads
   const isScrubbingRef = useRef(false) // Track if user is scrubbing playhead
+  const lastSeekTime = useRef<number>(0) // Prevent rapid seeking
+  const isResumingRef = useRef(false) // Prevent load effect from interfering with resume
+  const videoElementId = useRef<number>(0) // Track video element identity
+  const pendingLoadPromise = useRef<Promise<void> | null>(null)
+  const lastLoadedClipSignature = useRef<string | null>(null)
+  const scrubSyncPromise = useRef<Promise<void> | null>(null)
+  const pendingSeekPromise = useRef<Promise<void> | null>(null) // Prevent concurrent seeks
+  const resumingTimeoutId = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const seekSafely = useCallback(async (targetTime: number) => {
+    const video = videoRef.current
+    if (!video || Number.isNaN(targetTime)) return
+    
+    // Wait for any pending seek to complete first
+    if (pendingSeekPromise.current) {
+      try {
+        await pendingSeekPromise.current
+      } catch (error) {
+        console.warn('Pending seek failed:', error)
+      }
+    }
+
+    const withinTolerance = (value: number) => Math.abs(value - targetTime) <= SEEK_TOLERANCE
+
+    if (withinTolerance(video.currentTime)) {
+      return
+    }
+
+    // Create the seek operation and store it
+    const seekOperation = (async () => {
+      // Always wait for canplay to ensure video is truly ready for seeking
+      if (video.readyState < 3) {
+        await new Promise<void>((resolve) => {
+          const onCanPlay = () => {
+            video.removeEventListener('canplay', onCanPlay)
+            resolve()
+          }
+          video.addEventListener('canplay', onCanPlay, { once: true })
+        })
+      }
+
+      for (let attempt = 1; attempt <= MAX_SEEK_ATTEMPTS; attempt += 1) {
+        const beforeTime = video.currentTime
+        
+        // Set currentTime and check if browser accepts it
+        video.currentTime = targetTime
+        const immediateTime = video.currentTime
+        
+        // If browser rejected the assignment immediately, it's likely suspended
+        if (Math.abs(immediateTime - targetTime) > SEEK_TOLERANCE && Math.abs(immediateTime - beforeTime) < 0.001) {
+          // Force the browser to reload data
+          video.load()
+          
+          // Wait for loadeddata to ensure data is actually loaded
+          await new Promise<void>((resolve) => {
+            const onLoadedData = () => {
+              video.removeEventListener('loadeddata', onLoadedData)
+              video.removeEventListener('canplay', onCanPlay)
+              resolve()
+            }
+            const onCanPlay = () => {
+              video.removeEventListener('loadeddata', onLoadedData)
+              video.removeEventListener('canplay', onCanPlay)
+              resolve()
+            }
+            video.addEventListener('loadeddata', onLoadedData, { once: true })
+            video.addEventListener('canplay', onCanPlay, { once: true })
+            
+            // Timeout fallback
+            setTimeout(() => {
+              video.removeEventListener('loadeddata', onLoadedData)
+              video.removeEventListener('canplay', onCanPlay)
+              resolve()
+            }, 1000)
+          })
+          
+          // Try setting again after reload
+          video.currentTime = targetTime
+        }
+
+        // Wait for seeked event
+        await new Promise<void>((resolve, reject) => {
+          let timeoutId: ReturnType<typeof setTimeout> | null = null
+
+          const cleanup = () => {
+            video.removeEventListener('seeked', onSeeked)
+            video.removeEventListener('error', onError)
+            if (timeoutId) clearTimeout(timeoutId)
+          }
+
+          const onSeeked = () => {
+            cleanup()
+            resolve()
+          }
+
+          const onError = (event: Event) => {
+            const message = (event as any)?.message ?? video.error?.message ?? 'Video seek error'
+            cleanup()
+            reject(new Error(message))
+          }
+
+          video.addEventListener('seeked', onSeeked, { once: true })
+          video.addEventListener('error', onError, { once: true })
+
+          timeoutId = setTimeout(() => {
+            cleanup()
+            resolve()
+          }, SEEK_TIMEOUT_MS)
+        })
+
+        if (withinTolerance(video.currentTime)) {
+          return
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, SEEK_RETRY_DELAY_MS))
+      }
+
+      throw new Error(`Seek failed (target=${targetTime}, current=${videoRef.current?.currentTime})`)
+    })()
+
+    pendingSeekPromise.current = seekOperation
+    
+    try {
+      await seekOperation
+    } finally {
+      // Only clear if this is still the current pending seek
+      if (pendingSeekPromise.current === seekOperation) {
+        pendingSeekPromise.current = null
+      }
+    }
+  }, [])
+
   
   const tracks = useTimelineStore((state) => state.tracks)
   const selectedClipId = useTimelineStore((state) => state.selectedClipId)
@@ -28,125 +165,208 @@ export function VideoPreview() {
     : allClips[0]
   
   // Helper function to safely load a video source
-  const loadVideoSource = useCallback((filePath: string, seekTime: number) => {
+  const loadVideoSource = useCallback(async (filePath: string, seekTime: number) => {
     if (!videoRef.current) return
-    
+
     const video = videoRef.current
     const targetSrc = `safe-file:///${filePath}`
-    
-    // Only load if it's a different file and not already loading
+    const fileName = filePath.split('/').pop()
+
+    if (pendingLoadPromise.current) {
+      try {
+        await pendingLoadPromise.current
+      } catch (error) {
+        console.error('Pending load failed:', error)
+      }
+    }
+
     if (currentLoadedPath.current === filePath) {
-      // Same file - just seek
-      video.currentTime = seekTime
+      await seekSafely(seekTime)
       return
     }
-    
-    // Prevent concurrent loads
-    if (isLoadingRef.current) {
-      return
-    }
-    
-    isLoadingRef.current = true
-    currentLoadedPath.current = filePath
-    
-    // Set up one-time load handler
-    const onLoadedMetadata = () => {
-      video.currentTime = seekTime
+
+    const previousPath = currentLoadedPath.current
+
+    const loadPromise = new Promise<void>((resolve, reject) => {
+      const cleanup = () => {
+        video.removeEventListener('loadedmetadata', onLoadedMetadata)
+        video.removeEventListener('error', onError)
+      }
+
+      const onLoadedMetadata = () => {
+        cleanup()
+        resolve()
+      }
+
+      const onError = (event: Event) => {
+        const message = (event as any)?.message ?? video.error?.message ?? 'Unknown video load error'
+        cleanup()
+        reject(new Error(message))
+      }
+
+      isLoadingRef.current = true
+      
+      // Wait for loadeddata (not just loadedmetadata) to ensure seeking works
+      const onLoadedData = () => {
+        video.removeEventListener('loadeddata', onLoadedData)
+        video.removeEventListener('error', onError)
+        onLoadedMetadata()
+      }
+      
+      video.addEventListener('loadeddata', onLoadedData, { once: true })
+      video.addEventListener('error', onError, { once: true })
+      video.src = targetSrc
+      video.load() // Force browser to reload
+    })
+
+    pendingLoadPromise.current = loadPromise
+
+    try {
+      await loadPromise
+      currentLoadedPath.current = filePath
+      await seekSafely(seekTime)
+    } catch (error) {
+      currentLoadedPath.current = previousPath
+      throw error
+    } finally {
       isLoadingRef.current = false
-      video.removeEventListener('loadedmetadata', onLoadedMetadata)
+      pendingLoadPromise.current = null
     }
-    
-    video.addEventListener('loadedmetadata', onLoadedMetadata, { once: true })
-    video.src = targetSrc
-  }, [])
+  }, [seekSafely])
   
-  // Load selected clip into video element
+  // Load selected clip into video element (but don't reset position during playback)
   useEffect(() => {
-    if (!selectedClip || !videoRef.current) return
-    
     const video = videoRef.current
-    
-    // Add error handler for missing or corrupt files
+
+    if (!selectedClip || !video) {
+      lastLoadedClipSignature.current = null
+      return
+    }
+
+    if (isResumingRef.current || isLoadingRef.current) {
+      return
+    }
+
+    const clipSignature = [
+      selectedClip.id,
+      selectedClip.filePath,
+      selectedClip.trimStart,
+      selectedClip.trimEnd,
+      selectedClip.startTime,
+    ].join('|')
+
+    if (
+      clipSignature === lastLoadedClipSignature.current &&
+      currentLoadedPath.current === selectedClip.filePath
+    ) {
+      setDuration(selectedClip.trimEnd - selectedClip.trimStart)
+      return
+    }
+
+    const previousSignature = lastLoadedClipSignature.current
+    let cancelled = false
+
     const handleError = (e: Event) => {
       const target = e.target as HTMLVideoElement
       const error = target.error
-      
+
       if (error) {
-        // Log error but don't show alert (could be transient during rapid seeking)
         console.error('Video preview error:', selectedClip.filePath, error.message || error.code)
-        
-        // Only show alert for critical errors (file not found)
+
         if (error.code === 4 || error.code === 2) {
           const fileName = selectedClip.filePath.split('/').pop() || selectedClip.name
           const isTemp = selectedClip.filePath.includes('/clipforge-recordings/')
-          
+
           const errorMessage = isTemp
             ? `Temporary recording file is missing: ${fileName}\n\nThis file may have been deleted.`
             : `Could not load: ${fileName}\n\nThe file may be missing, moved, or corrupted.`
-          
+
           alert(errorMessage)
         }
       }
-      
-      // Stop playback and reset loading state on error
+
       setIsPlaying(false)
       isLoadingRef.current = false
+      pendingLoadPromise.current = null
+      lastLoadedClipSignature.current = null
     }
-    
+
     video.addEventListener('error', handleError)
-    
-    // Load the video source safely
-    loadVideoSource(selectedClip.filePath, selectedClip.trimStart)
-    setCurrentTime(selectedClip.trimStart)
-    setDuration(selectedClip.trimEnd - selectedClip.trimStart)
-    
+
+    const run = async () => {
+      try {
+        await loadVideoSource(selectedClip.filePath, selectedClip.trimStart)
+        if (!cancelled) {
+          setCurrentTime(selectedClip.trimStart)
+          lastLoadedClipSignature.current = clipSignature
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Load failed:', error)
+          setIsPlaying(false)
+          lastLoadedClipSignature.current = previousSignature
+        }
+      } finally {
+        if (!cancelled) {
+          setDuration(selectedClip.trimEnd - selectedClip.trimStart)
+        }
+      }
+    }
+
+    void run()
+
     return () => {
+      cancelled = true
       video.removeEventListener('error', handleError)
     }
   }, [selectedClip, loadVideoSource])
   
-  // Sync video with playhead position (for scrubbing)
+  // Sync video with playhead position (only when scrubbing - user is manually moving it)
   useEffect(() => {
-    if (!videoRef.current || !selectedClip || isPlaying) return
-    
-    // During scrubbing, only seek within the selected clip - don't auto-switch clips
-    if (isScrubbingRef.current) {
-      // Check if playhead is within the selected clip's bounds
-      const clipEnd = selectedClip.startTime + (selectedClip.trimEnd - selectedClip.trimStart)
-      
-      if (playheadPosition >= selectedClip.startTime && playheadPosition < clipEnd) {
-        // Playhead is within selected clip - seek to position
-        const clipRelativeTime = playheadPosition - selectedClip.startTime
-        const videoTime = selectedClip.trimStart + clipRelativeTime
-        
-        if (Math.abs(videoRef.current.currentTime - videoTime) > 0.1) {
-          videoRef.current.currentTime = videoTime
-          setCurrentTime(videoTime)
-        }
-      }
-      // If playhead is outside selected clip during scrubbing, don't do anything
-      // This prevents automatic clip switching during scrubbing
+    if (!videoRef.current || !selectedClip || !isScrubbingRef.current) return
+
+    const video = videoRef.current
+    const clipStart = selectedClip.startTime
+    const clipEnd = clipStart + (selectedClip.trimEnd - selectedClip.trimStart)
+
+    if (playheadPosition < clipStart || playheadPosition > clipEnd) {
       return
     }
-    
-    // Not scrubbing - allow automatic clip switching for playback
-    const currentClip = allClips.find(
-      clip => playheadPosition >= clip.startTime && 
-              playheadPosition < clip.startTime + (clip.trimEnd - clip.trimStart)
-    )
-    
-    if (currentClip && currentClip.id === selectedClip.id) {
-      // Playhead is on the selected clip - seek to the correct position
-      const clipRelativeTime = playheadPosition - currentClip.startTime
-      const videoTime = currentClip.trimStart + clipRelativeTime
-      
-      if (Math.abs(videoRef.current.currentTime - videoTime) > 0.1) {
-        videoRef.current.currentTime = videoTime
-        setCurrentTime(videoTime)
+
+    const clipRelativeTime = playheadPosition - clipStart
+    const videoTime = selectedClip.trimStart + clipRelativeTime
+
+    const now = performance.now()
+    if (now - lastSeekTime.current <= 16 || Math.abs(video.currentTime - videoTime) <= 0.03) {
+      return
+    }
+
+    lastSeekTime.current = now
+
+    const applySeek = () => {
+      const element = videoRef.current
+      if (!element) return
+
+      const withinTolerance = Math.abs(element.currentTime - videoTime) <= 0.02
+      if (withinTolerance) return
+
+      try {
+        element.currentTime = videoTime
+      } catch (error) {
+        console.warn('🎚️ Scrub preview seek failed', error)
       }
     }
-    // Removed automatic clip switching when not scrubbing to prevent infinite loop
-  }, [playheadPosition, selectedClip, allClips, isPlaying])
+
+    if (video.readyState >= 1) {
+      requestAnimationFrame(applySeek)
+    } else {
+      const onLoadedMetadata = () => {
+        video.removeEventListener('loadedmetadata', onLoadedMetadata)
+        requestAnimationFrame(applySeek)
+      }
+      video.addEventListener('loadedmetadata', onLoadedMetadata, { once: true })
+    }
+  }, [playheadPosition, selectedClip])
   
   // Update current time
   const handleTimeUpdate = useCallback(() => {
@@ -154,6 +374,10 @@ export function VideoPreview() {
     
     const video = videoRef.current
     const currentVideoTime = video.currentTime
+    
+    if (isResumingRef.current) {
+      return
+    }
     
     // Check if we've reached the end of the current clip
     if (currentVideoTime >= selectedClip.trimEnd) {
@@ -164,26 +388,61 @@ export function VideoPreview() {
       if (nextClip && isPlaying) {
         // Check if there's a gap between clips
         const currentClipEnd = selectedClip.startTime + (selectedClip.trimEnd - selectedClip.trimStart)
-        const hasGap = nextClip.startTime > currentClipEnd + 0.1 // Allow 0.1s tolerance
+        const gapDuration = nextClip.startTime - currentClipEnd
         
-        if (hasGap) {
-          // There's a gap - stop playback instead of jumping
+        if (gapDuration > 0.05) {
+          // There's a gap - continue playback through the blank space
+          // Pause video but keep isPlaying true so playhead keeps moving
           video.pause()
-          setIsPlaying(false)
+          
+          // Move playhead through the gap, then continue with next clip
+          let gapStartTime = Date.now()
+          const gapInterval = setInterval(() => {
+            const elapsed = (Date.now() - gapStartTime) / 1000
+            
+            if (elapsed >= gapDuration) {
+              clearInterval(gapInterval)
+              // Gap finished - load and play next clip
+              void loadVideoSource(nextClip.filePath, nextClip.trimStart)
+                .then(async () => {
+                  if (videoRef.current && isPlaying) {
+                    await videoRef.current.play()
+                  }
+                })
+                .then(() => {
+                  if (isPlaying) {
+                    useTimelineStore.getState().setSelectedClip(nextClip.id)
+                  }
+                })
+                .catch((error) => {
+                  console.error('Failed to resume after gap:', error)
+                  setIsPlaying(false)
+                })
+            } else {
+              // Update playhead position during gap
+              setPlayheadPosition(currentClipEnd + elapsed)
+            }
+          }, 16) // ~60fps updates
+          
           return
         }
         
-        // Load and play next clip
-        loadVideoSource(nextClip.filePath, nextClip.trimStart)
-        
-        // Wait a tiny bit for the load to start, then play
-        setTimeout(() => {
-          if (videoRef.current) {
-            videoRef.current.play().catch(() => setIsPlaying(false))
-          }
-        }, 50)
-        
-        useTimelineStore.getState().setSelectedClip(nextClip.id)
+        // No gap - immediately load and play next clip
+        void loadVideoSource(nextClip.filePath, nextClip.trimStart)
+          .then(async () => {
+            if (videoRef.current) {
+              await videoRef.current.play()
+            }
+          })
+          .then(() => {
+            if (isPlaying) {
+              useTimelineStore.getState().setSelectedClip(nextClip.id)
+            }
+          })
+          .catch((error) => {
+            console.error('Failed to continue playback:', error)
+            setIsPlaying(false)
+          })
       } else {
         // No more clips - stop playback
         video.pause()
@@ -200,37 +459,123 @@ export function VideoPreview() {
     
     setCurrentTime(currentVideoTime)
     
-    // Sync with timeline playhead (but not during scrubbing to avoid feedback loop)
-    if (!isScrubbingRef.current) {
+    // Only sync playhead position during actual playback, not when paused
+    // This prevents automatic playhead movement when not playing
+    if (isPlaying && !isScrubbingRef.current) {
       const timelinePosition = selectedClip.startTime + (currentVideoTime - selectedClip.trimStart)
       setPlayheadPosition(timelinePosition)
     }
   }, [selectedClip, allClips, isPlaying, setPlayheadPosition, loadVideoSource])
   
+  const syncVideoToPlayhead = useCallback(async () => {
+    const video = videoRef.current
+    if (!video || allClips.length === 0) return
+
+    let targetClip = allClips.find(
+      clip => playheadPosition >= clip.startTime &&
+              playheadPosition < clip.startTime + (clip.trimEnd - clip.trimStart)
+    )
+
+    if (!targetClip) {
+      targetClip = allClips.find((clip) => clip.startTime >= playheadPosition) ?? allClips[allClips.length - 1]
+    }
+
+    if (!targetClip) return
+
+    const clipRelativeTime = Math.max(0, playheadPosition - targetClip.startTime)
+    const boundedRelative = Math.min(clipRelativeTime, targetClip.trimEnd - targetClip.trimStart)
+    const videoTime = targetClip.trimStart + boundedRelative
+
+    try {
+      isResumingRef.current = true
+
+      if (currentLoadedPath.current !== targetClip.filePath) {
+        await loadVideoSource(targetClip.filePath, videoTime)
+        useTimelineStore.getState().setSelectedClip(targetClip.id)
+      } else if (Math.abs(video.currentTime - videoTime) > SEEK_TOLERANCE) {
+        await seekSafely(videoTime)
+      }
+
+      setCurrentTime(video.currentTime)
+    } catch (error) {
+      console.error('Sync failed:', error)
+      isResumingRef.current = false
+    }
+    // Note: Don't clear isResumingRef here - let resume() manage it if play is clicked
+    // This prevents the load effect from interfering between scrub end and play
+  }, [allClips, loadVideoSource, playheadPosition, seekSafely])
+
   // Play/Pause toggle
   const handlePlayPause = useCallback(() => {
-    if (!videoRef.current) return
-    
     const video = videoRef.current
+    if (!video) return
+
     if (video.paused) {
-      // Before playing, ensure we're on a valid clip
-      // If playhead is before all clips, jump to first clip
-      if (allClips.length > 0) {
-        const firstClip = allClips[0]
-        if (playheadPosition < firstClip.startTime) {
-          setPlayheadPosition(firstClip.startTime)
-          loadVideoSource(firstClip.filePath, firstClip.trimStart)
-          useTimelineStore.getState().setSelectedClip(firstClip.id)
-        }
+      // Clear the timeout since we're actually resuming now
+      if (resumingTimeoutId.current) {
+        clearTimeout(resumingTimeoutId.current)
+        resumingTimeoutId.current = null
       }
       
-      video.play()
-      setIsPlaying(true)
+      isResumingRef.current = true
+
+      const resume = async () => {
+        try {
+          if (allClips.length === 0) {
+            setIsPlaying(false)
+            return
+          }
+
+          if (scrubSyncPromise.current) {
+            try {
+              await scrubSyncPromise.current
+            } catch (error) {
+              console.warn('Scrub sync failed before resume:', error)
+            }
+          }
+
+          let targetClip = allClips.find(
+            clip => playheadPosition >= clip.startTime &&
+                    playheadPosition < clip.startTime + (clip.trimEnd - clip.trimStart)
+          )
+
+          if (!targetClip) {
+            targetClip = allClips.find((clip) => clip.startTime >= playheadPosition) ?? allClips[0]
+            setPlayheadPosition(targetClip.startTime)
+            await loadVideoSource(targetClip.filePath, targetClip.trimStart)
+            useTimelineStore.getState().setSelectedClip(targetClip.id)
+          } else {
+            const clipRelativeTime = playheadPosition - targetClip.startTime
+            const videoTime = targetClip.trimStart + clipRelativeTime
+
+            if (selectedClipId !== targetClip.id || currentLoadedPath.current !== targetClip.filePath) {
+              await loadVideoSource(targetClip.filePath, videoTime)
+              useTimelineStore.getState().setSelectedClip(targetClip.id)
+            } else if (Math.abs(video.currentTime - videoTime) > SEEK_TOLERANCE) {
+              await seekSafely(videoTime)
+            }
+          }
+
+          await video.play()
+          setIsPlaying(true)
+        } catch (error) {
+          console.error('Failed to resume playback:', error)
+          setIsPlaying(false)
+        } finally {
+          isResumingRef.current = false
+        }
+      }
+
+      void resume()
     } else {
+      if (selectedClip) {
+        const timelinePosition = selectedClip.startTime + (video.currentTime - selectedClip.trimStart)
+        setPlayheadPosition(timelinePosition)
+      }
       video.pause()
       setIsPlaying(false)
     }
-  }, [allClips, playheadPosition, setPlayheadPosition, loadVideoSource])
+  }, [allClips, loadVideoSource, playheadPosition, selectedClip, selectedClipId, seekSafely, setPlayheadPosition])
   
   // Stop (pause and reset to start of timeline)
   const handleStop = useCallback(() => {
@@ -246,49 +591,82 @@ export function VideoPreview() {
     // If there's a first clip, load it and seek to its start
     if (allClips.length > 0) {
       const firstClip = allClips[0]
-      loadVideoSource(firstClip.filePath, firstClip.trimStart)
-      setCurrentTime(firstClip.trimStart)
-      useTimelineStore.getState().setSelectedClip(firstClip.id)
+      void loadVideoSource(firstClip.filePath, firstClip.trimStart)
+        .then(() => {
+          setCurrentTime(firstClip.trimStart)
+          useTimelineStore.getState().setSelectedClip(firstClip.id)
+        })
+        .catch((error) => {
+          console.error('Failed to reset playback:', error)
+        })
     }
   }, [allClips, setPlayheadPosition, loadVideoSource])
   
-  // Jump to start of timeline
+  // Jump to previous clip
   const handleJumpToStart = useCallback(() => {
-    if (!videoRef.current) return
+    if (!videoRef.current || !selectedClip || allClips.length === 0) return
     
-    // Move playhead to start of timeline
-    setPlayheadPosition(0)
+    // Find current clip index
+    const currentIndex = allClips.findIndex(c => c.id === selectedClip.id)
     
-    // Load first clip if available
-    if (allClips.length > 0) {
-      const firstClip = allClips[0]
-      loadVideoSource(firstClip.filePath, firstClip.trimStart)
-      setCurrentTime(firstClip.trimStart)
-      useTimelineStore.getState().setSelectedClip(firstClip.id)
+    if (currentIndex > 0) {
+      // Go to previous clip
+      const prevClip = allClips[currentIndex - 1]
+      setPlayheadPosition(prevClip.startTime)
+      void loadVideoSource(prevClip.filePath, prevClip.trimStart)
+        .then(() => {
+          setCurrentTime(prevClip.trimStart)
+          useTimelineStore.getState().setSelectedClip(prevClip.id)
+        })
+        .catch((error) => {
+          console.error('Failed to jump to previous clip:', error)
+        })
+    } else {
+      // Already at first clip - go to its start
+      setPlayheadPosition(selectedClip.startTime)
+      videoRef.current.currentTime = selectedClip.trimStart
+      setCurrentTime(selectedClip.trimStart)
     }
-  }, [allClips, setPlayheadPosition, loadVideoSource])
+  }, [selectedClip, allClips, setPlayheadPosition, loadVideoSource])
   
-  // Jump to end of timeline
+  // Jump to next clip
   const handleJumpToEnd = useCallback(() => {
-    if (!videoRef.current || allClips.length === 0) return
+    if (!videoRef.current || !selectedClip || allClips.length === 0) return
     
-    // Find the last clip
-    const lastClip = allClips[allClips.length - 1]
-    const timelineEnd = lastClip.startTime + (lastClip.trimEnd - lastClip.trimStart)
+    // Find current clip index
+    const currentIndex = allClips.findIndex(c => c.id === selectedClip.id)
     
-    // Move playhead to end of timeline
-    setPlayheadPosition(timelineEnd - 0.1)
-    
-    // Load and seek to last clip
-    loadVideoSource(lastClip.filePath, lastClip.trimEnd - 0.1)
-    setCurrentTime(lastClip.trimEnd - 0.1)
-    useTimelineStore.getState().setSelectedClip(lastClip.id)
-  }, [allClips, setPlayheadPosition, loadVideoSource])
+    if (currentIndex < allClips.length - 1) {
+      // Go to next clip
+      const nextClip = allClips[currentIndex + 1]
+      setPlayheadPosition(nextClip.startTime)
+      void loadVideoSource(nextClip.filePath, nextClip.trimStart)
+        .then(() => {
+          setCurrentTime(nextClip.trimStart)
+          useTimelineStore.getState().setSelectedClip(nextClip.id)
+        })
+        .catch((error) => {
+          console.error('Failed to jump to next clip:', error)
+        })
+    } else {
+      // Already at last clip - go to its end
+      const clipEnd = selectedClip.startTime + (selectedClip.trimEnd - selectedClip.trimStart)
+      setPlayheadPosition(clipEnd - 0.1)
+      videoRef.current.currentTime = selectedClip.trimEnd - 0.1
+      setCurrentTime(selectedClip.trimEnd - 0.1)
+    }
+  }, [selectedClip, allClips, setPlayheadPosition, loadVideoSource])
   
   // Listen for scrubbing events (playhead dragging)
   useEffect(() => {
     const handleStartScrubbing = () => {
       isScrubbingRef.current = true
+      // Clear resuming flag and any pending timeout
+      isResumingRef.current = false
+      if (resumingTimeoutId.current) {
+        clearTimeout(resumingTimeoutId.current)
+        resumingTimeoutId.current = null
+      }
       // Pause playback when scrubbing starts
       if (videoRef.current && !videoRef.current.paused) {
         videoRef.current.pause()
@@ -298,6 +676,28 @@ export function VideoPreview() {
     
     const handleEndScrubbing = () => {
       isScrubbingRef.current = false
+      // Update currentTime display when scrubbing ends
+      if (videoRef.current) {
+        setCurrentTime(videoRef.current.currentTime)
+      }
+
+       const syncPromise = syncVideoToPlayhead()
+       scrubSyncPromise.current = syncPromise
+       void syncPromise.finally(() => {
+         if (scrubSyncPromise.current === syncPromise) {
+           scrubSyncPromise.current = null
+         }
+       })
+       
+       // Clear the resuming flag after a delay if no play happens
+       // This prevents the flag from staying stuck
+       if (resumingTimeoutId.current) {
+         clearTimeout(resumingTimeoutId.current)
+       }
+       resumingTimeoutId.current = setTimeout(() => {
+         isResumingRef.current = false
+         resumingTimeoutId.current = null
+       }, 2000)
     }
     
     window.addEventListener('pause-playback', handleStartScrubbing)
@@ -307,7 +707,7 @@ export function VideoPreview() {
       window.removeEventListener('pause-playback', handleStartScrubbing)
       window.removeEventListener('scrubbing-end', handleEndScrubbing)
     }
-  }, [])
+  }, [syncVideoToPlayhead])
   
   // Keyboard shortcuts
   useEffect(() => {
@@ -332,15 +732,16 @@ export function VideoPreview() {
   return (
     <section className="video-preview">
       <div className="preview-container">
-        {selectedClip ? (
-          <video
-            ref={videoRef}
-            className="preview-video"
-            onTimeUpdate={handleTimeUpdate}
-          >
-            Your browser does not support video playback.
-          </video>
-        ) : (
+        <video
+          ref={videoRef}
+          className="preview-video"
+          onTimeUpdate={handleTimeUpdate}
+          preload="auto"
+          style={{ display: selectedClip ? 'block' : 'none' }}
+        >
+          Your browser does not support video playback.
+        </video>
+        {!selectedClip && (
           <div className="preview-placeholder">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -355,7 +756,7 @@ export function VideoPreview() {
           className="btn-control" 
           onClick={handleJumpToStart}
           disabled={!selectedClip}
-          title="Jump to start"
+          title="Previous clip"
         >
           ⏮
         </button>
@@ -371,7 +772,7 @@ export function VideoPreview() {
           className="btn-control" 
           onClick={handleStop}
           disabled={!selectedClip}
-          title="Stop"
+          title="Stop and reset"
         >
           ⏹
         </button>
@@ -379,7 +780,7 @@ export function VideoPreview() {
           className="btn-control" 
           onClick={handleJumpToEnd}
           disabled={!selectedClip}
-          title="Jump to end"
+          title="Next clip"
         >
           ⏭
         </button>

@@ -18,6 +18,7 @@ export function Timeline() {
   
   const timelineRef = useRef<HTMLDivElement>(null)
   const [isDraggingPlayhead, setIsDraggingPlayhead] = useState(false)
+  const playheadDragOffset = useRef(0) // Track where user clicked within playhead
   
   // Calculate timeline width based on duration and zoom
   const timelineWidth = Math.max(duration * zoom, 800)
@@ -62,18 +63,33 @@ export function Timeline() {
   const handlePlayheadMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
+    
+    if (!timelineRef.current) return
+    
+    // Calculate the offset: where the mouse is relative to the playhead's current position
+    const timeline = timelineRef.current
+    const rect = timeline.getBoundingClientRect()
+    const currentPlayheadPixelPosition = playheadPosition * zoom
+    const mousePositionInTimeline = e.clientX - rect.left
+    
+    // Store the offset so dragging feels natural
+    playheadDragOffset.current = mousePositionInTimeline - currentPlayheadPixelPosition
+    
     setIsDraggingPlayhead(true)
     
     // Pause playback when dragging playhead
     window.dispatchEvent(new CustomEvent('pause-playback'))
-  }, [])
+  }, [playheadPosition, zoom])
   
   const handlePlayheadMouseMove = useCallback((e: MouseEvent) => {
     if (!isDraggingPlayhead || !timelineRef.current) return
     
     const timeline = timelineRef.current
     const rect = timeline.getBoundingClientRect()
-    const offsetX = e.clientX - rect.left
+    const mousePositionInTimeline = e.clientX - rect.left
+    
+    // Subtract the initial drag offset for accurate tracking
+    const offsetX = mousePositionInTimeline - playheadDragOffset.current
     const newPosition = Math.max(0, Math.min(duration, offsetX / zoom))
     
     setPlayheadPosition(newPosition)
@@ -98,6 +114,39 @@ export function Timeline() {
       }
     }
   }, [isDraggingPlayhead, handlePlayheadMouseMove, handlePlayheadMouseUp])
+  
+  // Auto-scroll to keep playhead visible
+  useEffect(() => {
+    if (!timelineRef.current) return
+    
+    const container = timelineRef.current
+    const playheadPixelPosition = playheadPosition * zoom
+    const containerWidth = container.clientWidth
+    const scrollLeft = container.scrollLeft
+    
+    // Define margins - keep playhead away from edges
+    const leftMargin = 100 // pixels
+    const rightMargin = 100 // pixels
+    
+    // Check if playhead is going off the right edge
+    if (playheadPixelPosition > scrollLeft + containerWidth - rightMargin) {
+      // Scroll right to keep playhead visible
+      const targetScroll = playheadPixelPosition - containerWidth + rightMargin
+      container.scrollTo({
+        left: targetScroll,
+        behavior: 'smooth'
+      })
+    }
+    // Check if playhead is going off the left edge
+    else if (playheadPixelPosition < scrollLeft + leftMargin) {
+      // Scroll left to keep playhead visible
+      const targetScroll = Math.max(0, playheadPixelPosition - leftMargin)
+      container.scrollTo({
+        left: targetScroll,
+        behavior: 'smooth'
+      })
+    }
+  }, [playheadPosition, zoom])
   
   // Keyboard shortcuts
   useEffect(() => {

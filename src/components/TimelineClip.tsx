@@ -122,7 +122,7 @@ export function TimelineClip({ clip, zoom }: TimelineClipProps) {
     
     return proposedStartTime
   }, [clip.id, clip.trackId, tracks])
-
+  
   // Mouse move handler with optimistic UI
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!isDraggingLeft && !isDraggingRight && !isDraggingClip) return
